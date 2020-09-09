@@ -91,9 +91,13 @@ def on_scan(scan):
     front_lidar = get_filtered_lidar(gen_numpy, cnf.boundary)
     bev_map = makeBEVMap(front_lidar, cnf.boundary)
     bev_map = torch.from_numpy(bev_map)
+    back_lidar = get_filtered_lidar(gen_numpy, cnf.boundary_back)
+    back_bevmap = makeBEVMap(back_lidar, cnf.boundary_back)
+    back_bevmap = torch.from_numpy(back_bevmap)
 
     with torch.no_grad():
         detections, bev_map, fps = do_detect(configs, model, bev_map, is_front=True)
+        back_detections, back_bevmap, _ = do_detect(configs, model, back_bevmap, is_front=False)
     print(fps)
     objects_msg = DetectedObjectArray()
     objects_msg.header.stamp = rospy.Time.now()
@@ -103,7 +107,7 @@ def on_scan(scan):
         class_name = ID_TO_CLASS_NAME[j]
 
         if len(detections[j]) > 0:
-            flag = True
+            # flag = True
             for det in detections[j]:
                 _score, _x, _y, _z, _h, _w, _l, _yaw = det
                 yaw = -_yaw
@@ -135,8 +139,40 @@ def on_scan(scan):
                 obj.dimensions.y = w
                 obj.dimensions.z = _h
                 objects_msg.objects.append(obj)
-    if flag is True:
-        pub.publish(objects_msg)
+
+        if len(back_detections[j]) > 0:
+            for det in back_detections[j]:
+                _score, _x, _y, _z, _h, _w, _l, _yaw = det
+                yaw = -_yaw
+                x = _y / cnf.BEV_HEIGHT * cnf.bound_size_x + cnf.boundary['minX']
+                y = _x / cnf.BEV_WIDTH * cnf.bound_size_y + cnf.boundary['minY']
+                z = _z + cnf.boundary_back['minZ']
+                w = _w / cnf.BEV_WIDTH * cnf.bound_size_y
+                l = _l / cnf.BEV_HEIGHT * cnf.bound_size_x
+                obj = DetectedObject()
+                obj.header.stamp = rospy.Time.now()
+                obj.header.frame_id = scan.header.frame_id
+
+                obj.score = 0.9
+                obj.pose_reliable = True
+                
+                obj.space_frame = scan.header.frame_id
+                obj.label = class_name
+                obj.score = _score
+                obj.pose.position.x = -x
+                obj.pose.position.y = -y
+                obj.pose.position.z = z
+                [qx, qy, qz, qw] = euler_to_quaternion(yaw, 0, 0)
+                obj.pose.orientation.x = qx
+                obj.pose.orientation.y = qy
+                obj.pose.orientation.z = qz
+                obj.pose.orientation.w = qw
+                
+                obj.dimensions.x = l
+                obj.dimensions.y = w
+                obj.dimensions.z = _h
+                objects_msg.objects.append(obj)
+    pub.publish(objects_msg)
         
     stop = timeit.default_timer()
     print('Time: ', stop - start)
