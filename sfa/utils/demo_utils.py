@@ -122,6 +122,26 @@ def do_detect(configs, model, bevmap, is_front):
 
     return detections[0], bevmap, fps
 
+def do_detect_2sides(configs, model, bevmap, back_bevmap):
+    back_bevmap = torch.flip(back_bevmap, [1, 2])
+
+    input_bev_maps = bevmap.unsqueeze(0).to(configs.device, non_blocking=True).float()
+    input_back_bev_maps = back_bevmap.unsqueeze(0).to(configs.device, non_blocking=True).float()
+    inputs_2sides = torch.cat((input_bev_maps, input_back_bev_maps), 0)
+    t1 = time_synchronized()
+    outputs = model(inputs_2sides)
+    outputs['hm_cen'] = _sigmoid(outputs['hm_cen'])
+    outputs['cen_offset'] = _sigmoid(outputs['cen_offset'])
+    # detections size (batch_size, K, 10)
+    detections = decode(outputs['hm_cen'], outputs['cen_offset'], outputs['direction'], outputs['z_coor'],
+                        outputs['dim'], K=configs.K)
+    detections = detections.cpu().numpy().astype(np.float32)
+    detections = post_processing(detections, configs.num_classes, configs.down_ratio, configs.peak_thresh)
+    t2 = time_synchronized()
+    # Inference speed
+    fps = 1 / (t2 - t1)
+    return detections[0], detections[1], bevmap, fps
+
 
 def write_credit(img, org_author=(500, 400), text_author='github.com/maudzung', org_fps=(50, 1000), fps=None):
     font = cv2.FONT_HERSHEY_SIMPLEX
