@@ -13,6 +13,46 @@ sys.path.append('../')
 
 import sfa.config.kitti_config as cnf
 
+def makeBEVMap_binary(PointCloud_, boundary):
+    Height = cnf.BEV_HEIGHT + 1
+    Width = cnf.BEV_WIDTH + 1
+
+    # Discretize Feature Map
+    PointCloud = np.copy(PointCloud_)
+    PointCloud[:, 0] = np.int_(np.floor(PointCloud[:, 0] / cnf.DISCRETIZATION))
+    PointCloud[:, 1] = np.int_(np.floor(PointCloud[:, 1] / cnf.DISCRETIZATION) + Width / 2)
+
+    # sort-3times
+    indices = np.lexsort((-PointCloud[:, 2], PointCloud[:, 1], PointCloud[:, 0]))
+    PointCloud = PointCloud[indices]
+
+    # Height Map
+    heightMap = np.zeros((Height, Width))
+
+    _, indices = np.unique(PointCloud[:, 0:2], axis=0, return_index=True)
+    PointCloud_frac = PointCloud[indices]
+    # some important problem is image coordinate is (y,x), not (x,y)
+    max_height = float(np.abs(boundary['maxZ'] - boundary['minZ']))
+    heightMap[np.int_(PointCloud_frac[:, 0]), np.int_(PointCloud_frac[:, 1])] = PointCloud_frac[:, 2] / max_height
+
+    # Intensity Map & DensityMap
+    intensityMap = np.zeros((Height, Width))
+    densityMap = np.zeros((Height, Width))
+
+    _, indices, counts = np.unique(PointCloud[:, 0:2], axis=0, return_index=True, return_counts=True)
+    PointCloud_top = PointCloud[indices]
+
+    normalizedCounts = np.minimum(1.0, np.log(counts + 1) / np.log(64))
+
+    intensityMap[np.int_(PointCloud_top[:, 0]), np.int_(PointCloud_top[:, 1])] = PointCloud_top[:, 3]
+    densityMap[np.int_(PointCloud_top[:, 0]), np.int_(PointCloud_top[:, 1])] = 1
+
+    RGB_Map = np.zeros((3, Height - 1, Width - 1))
+    RGB_Map[2, :, :] = densityMap[:cnf.BEV_HEIGHT, :cnf.BEV_WIDTH]  # r_map
+    RGB_Map[1, :, :] = densityMap[:cnf.BEV_HEIGHT, :cnf.BEV_WIDTH]  # g_map
+    RGB_Map[0, :, :] = densityMap[:cnf.BEV_HEIGHT, :cnf.BEV_WIDTH]  # b_map
+
+    return RGB_Map
 
 def makeBEVMap(PointCloud_, boundary):
     Height = cnf.BEV_HEIGHT + 1
