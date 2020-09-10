@@ -111,6 +111,12 @@ def do_detect(configs, model, bevmap, is_front):
     outputs = model(input_bev_maps)
     outputs['hm_cen'] = _sigmoid(outputs['hm_cen'])
     outputs['cen_offset'] = _sigmoid(outputs['cen_offset'])
+    # print(torch.max(outputs['cen_offset']))
+    # # Test 0 offset
+    # outputs['cen_offset'] = torch.zeros_like(outputs['cen_offset'])
+    # print('-----')
+    # print(torch.max(outputs['cen_offset']))
+    # print('-----')
     # detections size (batch_size, K, 10)
     detections = decode(outputs['hm_cen'], outputs['cen_offset'], outputs['direction'], outputs['z_coor'],
                         outputs['dim'], K=configs.K)

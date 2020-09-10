@@ -28,7 +28,7 @@ from tqdm import tqdm
 sys.path.append('./')
 if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-sys.path.append('/home/khg/Python_proj/Super-Fast-Accurate-3D-Object-Detection')
+sys.path.append('/home/usrg/python_ws/Super-Fast-Accurate-3D-Object-Detection')
 from sfa.data_process.kitti_dataloader import create_train_dataloader, create_val_dataloader
 from sfa.models.model_utils import create_model, make_data_parallel, get_num_parameters
 from sfa.utils.train_utils import create_optimizer, create_lr_scheduler, get_saved_state, save_checkpoint

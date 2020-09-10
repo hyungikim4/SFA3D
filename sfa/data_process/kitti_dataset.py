@@ -241,7 +241,7 @@ class KittiDataset(Dataset):
 
             # Generate object masks
             obj_mask[k] = 1
-
+            
         targets = {
             'hm_cen': hm_main_center,
             'cen_offset': cen_offset,
