@@ -23,7 +23,7 @@ import cv2
 import torch
 
 sys.path.append('./')
-sys.path.append('/home/khg/Python_proj/Super-Fast-Accurate-3D-Object-Detection')
+sys.path.append('/home/usrg/python_ws/Super-Fast-Accurate-3D-Object-Detection')
 from sfa.models.model_utils import create_model
 from sfa.utils.evaluation_utils import draw_predictions, convert_det_to_real_values
 import sfa.config.kitti_config as cnf
@@ -52,7 +52,7 @@ def get_xyzi_points(cloud_array, remove_nans=True, dtype=np.float):
     # remove crap points
     # print(cloud_array.dtype.names)
     if remove_nans:
-        mask = np.isfinite(cloud_array['x']) & np.isfinite(cloud_array['y']) & np.isfinite(cloud_array['z']) & np.isfinite(cloud_array['i'])
+        mask = np.isfinite(cloud_array['x']) & np.isfinite(cloud_array['y']) & np.isfinite(cloud_array['z']) & np.isfinite(cloud_array['intensity'])
         cloud_array = cloud_array[mask]
     
     # pull out x, y, and z values + intensity
@@ -60,7 +60,7 @@ def get_xyzi_points(cloud_array, remove_nans=True, dtype=np.float):
     points[...,0] = cloud_array['x']
     points[...,1] = cloud_array['y']
     points[...,2] = cloud_array['z']
-    points[...,3] = cloud_array['i']
+    points[...,3] = cloud_array['intensity']
 
     return points
 
@@ -92,16 +92,20 @@ class SFA3D():
         self.model.eval()
         
         self.detection_pub = rospy.Publisher('detected_objects', DetectedObjectArray, queue_size=1)
-        self.velo_sub = rospy.Subscriber("/kitti/velo/pointcloud", PointCloud2, self.velo_callback) # "/kitti/velo/pointcloud"
+        self.velo_sub = rospy.Subscriber("/kitti/velo/pointcloud", PointCloud2, self.velo_callback, queue_size=1) # "/kitti/velo/pointcloud"
         print("Started Node")
 
 
     def velo_callback(self, msg):
+        print('callback')
         self.is_callback = True
         self.scan = msg
+        # self.on_scan(msg)
 
     def on_scan(self, scan):
-        if (scan is None or not self.is_callback):
+        # if (scan is None or not self.is_callback):
+        #     return
+        if (scan is None):
             return
         start = timeit.default_timer()
         rospy.loginfo("Got scan")
@@ -128,9 +132,9 @@ class SFA3D():
         back_bevmap = torch.from_numpy(back_bevmap)
 
         with torch.no_grad():
-            # detections, bev_map, fps = do_detect(self.configs, self.model, bev_map, is_front=True)
+            detections, bev_map, fps = do_detect(self.configs, self.model, bev_map, is_front=True)
             # back_detections, back_bevmap, _ = do_detect(self.configs, self.model, back_bevmap, is_front=False)
-            detections, back_detections, bev_map, fps = do_detect_2sides(self.configs, self.model, bev_map, back_bevmap)
+            # detections, back_detections, bev_map, fps = do_detect_2sides(self.configs, self.model, bev_map, back_bevmap)
         print(fps)
         objects_msg = DetectedObjectArray()
         objects_msg.header.stamp = rospy.Time.now()
@@ -173,38 +177,38 @@ class SFA3D():
                     obj.dimensions.z = _h
                     objects_msg.objects.append(obj)
 
-            if len(back_detections[j]) > 0:
-                for det in back_detections[j]:
-                    _score, _x, _y, _z, _h, _w, _l, _yaw = det
-                    yaw = -_yaw
-                    x = _y / cnf.BEV_HEIGHT * cnf.bound_size_x + cnf.boundary['minX']
-                    y = _x / cnf.BEV_WIDTH * cnf.bound_size_y + cnf.boundary['minY']
-                    z = _z + cnf.boundary_back['minZ']
-                    w = _w / cnf.BEV_WIDTH * cnf.bound_size_y
-                    l = _l / cnf.BEV_HEIGHT * cnf.bound_size_x
-                    obj = DetectedObject()
-                    obj.header.stamp = rospy.Time.now()
-                    obj.header.frame_id = scan.header.frame_id
+            # if len(back_detections[j]) > 0:
+            #     for det in back_detections[j]:
+            #         _score, _x, _y, _z, _h, _w, _l, _yaw = det
+            #         yaw = -_yaw
+            #         x = _y / cnf.BEV_HEIGHT * cnf.bound_size_x + cnf.boundary['minX']
+            #         y = _x / cnf.BEV_WIDTH * cnf.bound_size_y + cnf.boundary['minY']
+            #         z = _z + cnf.boundary_back['minZ']
+            #         w = _w / cnf.BEV_WIDTH * cnf.bound_size_y
+            #         l = _l / cnf.BEV_HEIGHT * cnf.bound_size_x
+            #         obj = DetectedObject()
+            #         obj.header.stamp = rospy.Time.now()
+            #         obj.header.frame_id = scan.header.frame_id
 
-                    obj.score = 0.9
-                    obj.pose_reliable = True
+            #         obj.score = 0.9
+            #         obj.pose_reliable = True
                     
-                    obj.space_frame = scan.header.frame_id
-                    obj.label = class_name
-                    obj.score = _score
-                    obj.pose.position.x = -x
-                    obj.pose.position.y = -y
-                    obj.pose.position.z = z
-                    [qx, qy, qz, qw] = euler_to_quaternion(yaw, 0, 0)
-                    obj.pose.orientation.x = qx
-                    obj.pose.orientation.y = qy
-                    obj.pose.orientation.z = qz
-                    obj.pose.orientation.w = qw
+            #         obj.space_frame = scan.header.frame_id
+            #         obj.label = class_name
+            #         obj.score = _score
+            #         obj.pose.position.x = -x
+            #         obj.pose.position.y = -y
+            #         obj.pose.position.z = z
+            #         [qx, qy, qz, qw] = euler_to_quaternion(yaw, 0, 0)
+            #         obj.pose.orientation.x = qx
+            #         obj.pose.orientation.y = qy
+            #         obj.pose.orientation.z = qz
+            #         obj.pose.orientation.w = qw
                     
-                    obj.dimensions.x = l
-                    obj.dimensions.y = w
-                    obj.dimensions.z = _h
-                    objects_msg.objects.append(obj)
+            #         obj.dimensions.x = l
+            #         obj.dimensions.y = w
+            #         obj.dimensions.z = _h
+            #         objects_msg.objects.append(obj)
         self.detection_pub.publish(objects_msg)
             
         stop = timeit.default_timer()
