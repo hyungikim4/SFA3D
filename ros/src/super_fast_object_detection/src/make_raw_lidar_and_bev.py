@@ -16,7 +16,7 @@ import sys
 if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
-sys.path.append('/home/khg/Python_proj/Super-Fast-Accurate-3D-Object-Detection')
+sys.path.append('/home/khg/Python_proj/SFA3D')
 from sfa.data_process.kitti_bev_utils import makeBEVMap, makeBEVMap_binary
 import sfa.config.veloster_config as cnf
 from sfa.data_process.kitti_data_utils import get_filtered_lidar
@@ -43,15 +43,18 @@ def get_xyzi_points(cloud_array, remove_nans=True, dtype=np.float):
 
 class MakeBevImages():
     def __init__(self):
+        self.save_RGB_binray_all = True
         self.save_RGB_bev_input = False
         self.do_overwrite = True
         self.velo_sub = rospy.Subscriber("/transformed_pointcloud", PointCloud2, self.velo_callback, queue_size=1)
-        self.save_dir_path = '/home/khg/Python_proj/Super-Fast-Accurate-3D-Object-Detection/dataset/veloster/training'
+        self.save_dir_path = '/home/khg/Python_proj/SFA3D/dataset/veloster/training'
         self.save_lidar_path = os.path.join(self.save_dir_path, 'lidar')
         self.save_front_bev_path = os.path.join(self.save_dir_path, 'front_bev')
         self.save_back_bev_path = os.path.join(self.save_dir_path, 'back_bev')
         self.save_front_label_path = os.path.join(self.save_dir_path, 'front_label')
         self.save_back_label_path = os.path.join(self.save_dir_path, 'back_label')
+        if not os.path.exists(self.save_dir_path):
+            os.mkdir(self.save_dir_path)
         if not os.path.exists(self.save_lidar_path):
             os.mkdir(self.save_lidar_path)
         if not os.path.exists(self.save_front_bev_path):
@@ -88,17 +91,39 @@ class MakeBevImages():
         # save bev images
         front_lidar = get_filtered_lidar(gen_numpy, cnf.boundary)
         back_lidar = get_filtered_lidar(gen_numpy, cnf.boundary_back)
-        if self.save_RGB_bev_input:
+        if self.save_RGB_binray_all:
             bev_map = makeBEVMap(front_lidar, cnf.boundary)
             back_bevmap = makeBEVMap(back_lidar, cnf.boundary_back)
+            bev_map_binary = makeBEVMap_binary(front_lidar, cnf.boundary)
+            back_bevmap_binary = makeBEVMap_binary(back_lidar, cnf.boundary_back)
+
+            bev_map = np.transpose(bev_map, (2,1,0))
+            back_bevmap = np.transpose(back_bevmap, (2,1,0))
+            bev_map_binary = np.transpose(bev_map_binary, (2,1,0))
+            back_bevmap_binary = np.transpose(back_bevmap_binary, (2,1,0))
+
+            all_bev_map = np.zeros((cnf.BEV_HEIGHT, 2*cnf.BEV_WIDTH, 3))
+            all_back_bev_map = np.zeros((cnf.BEV_HEIGHT, 2*cnf.BEV_WIDTH, 3))
+
+            all_bev_map[:,:cnf.BEV_WIDTH,:] = bev_map
+            all_bev_map[:,cnf.BEV_WIDTH:,:] = bev_map_binary
+            all_back_bev_map[:,:cnf.BEV_WIDTH,:] = back_bevmap
+            all_back_bev_map[:,cnf.BEV_WIDTH:,:] = back_bevmap_binary
+
+            bev_map = (all_bev_map*255).astype(np.uint8)
+            back_bevmap = (all_back_bev_map*255).astype(np.uint8)
         else:
-            bev_map = makeBEVMap_binary(front_lidar, cnf.boundary)
-            back_bevmap = makeBEVMap_binary(back_lidar, cnf.boundary_back)
+            if self.save_RGB_bev_input:
+                bev_map = makeBEVMap(front_lidar, cnf.boundary)
+                back_bevmap = makeBEVMap(back_lidar, cnf.boundary_back)
+            else:
+                bev_map = makeBEVMap_binary(front_lidar, cnf.boundary)
+                back_bevmap = makeBEVMap_binary(back_lidar, cnf.boundary_back)
         
-        bev_map = np.transpose(bev_map, (2,1,0))
-        back_bevmap = np.transpose(back_bevmap, (2,1,0))
-        bev_map = (bev_map*255).astype(np.uint8)
-        back_bevmap = (back_bevmap*255).astype(np.uint8)
+            bev_map = np.transpose(bev_map, (2,1,0))
+            back_bevmap = np.transpose(back_bevmap, (2,1,0))
+            bev_map = (bev_map*255).astype(np.uint8)
+            back_bevmap = (back_bevmap*255).astype(np.uint8)
         # cv2.imshow('bev', bev_map)
         # cv2.imshow('back', back_bevmap)
         # cv2.waitKey(1)
