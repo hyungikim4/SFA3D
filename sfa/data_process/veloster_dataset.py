@@ -17,7 +17,7 @@ import numpy as np
 from torch.utils.data import Dataset
 if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-sys.path.append('/home/khg/Python_proj/Super-Fast-Accurate-3D-Object-Detection')
+sys.path.append('/home/khg/Python_proj/SFA3D')
 import cv2
 import torch
 
@@ -26,8 +26,9 @@ sys.path.append('../')
 from sfa.data_process.kitti_data_utils import gen_hm_radius, compute_radius, Calibration, get_filtered_lidar
 from sfa.data_process.kitti_bev_utils import makeBEVMap, drawRotatedBox, get_corners
 from sfa.data_process import transformation
-import sfa.config.kitti_config as cnf
 
+from xml.etree.ElementTree import parse
+import sfa.config.veloster_config as cnf
 
 class VelosterDataset(Dataset):
     def __init__(self, configs, mode='train', lidar_aug=None, hflip_prob=None, num_samples=None):
@@ -46,7 +47,7 @@ class VelosterDataset(Dataset):
         self.lidar_aug = lidar_aug
         self.hflip_prob = hflip_prob
 
-        self.image_dir = os.path.join(self.dataset_dir, sub_folder, "front_bev")
+        self.image_dir = os.path.join(self.dataset_dir, sub_folder, "front_image")
         self.lidar_dir = os.path.join(self.dataset_dir, sub_folder, "lidar")
         self.calib_dir = os.path.join(self.dataset_dir, sub_folder, "calib")
         self.label_dir = os.path.join(self.dataset_dir, sub_folder, "front_label")
@@ -117,7 +118,6 @@ class VelosterDataset(Dataset):
 
     def get_image(self, idx):
         img_path = os.path.join(self.image_dir, '{:06d}.png'.format(idx))
-        print(img_path)
         img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
 
         return img_path, img
@@ -128,32 +128,62 @@ class VelosterDataset(Dataset):
         return Calibration(calib_file)
 
     def get_lidar(self, idx):
-        lidar_file = os.path.join(self.lidar_dir, '{:06d}.bin'.format(idx))
+        lidar_file = os.path.join(self.lidar_dir, '{:06d}.npy'.format(idx))
         # assert os.path.isfile(lidar_file)
-        return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
+        # return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
+        return np.load(lidar_file).reshape(-1, 4)
 
     def get_label(self, idx):
-        labels = []
-        label_path = os.path.join(self.label_dir, '{:06d}.txt'.format(idx))
-        for line in open(label_path, 'r'):
-            line = line.rstrip()
-            line_parts = line.split(' ')
-            obj_name = line_parts[0]  # 'Car', 'Pedestrian', ...
-            cat_id = int(cnf.CLASS_NAME_TO_ID[obj_name])
-            if cat_id <= -99:  # ignore Tram and Misc
-                continue
-            truncated = int(float(line_parts[1]))  # truncated pixel ratio [0..1]
-            occluded = int(line_parts[2])  # 0=visible, 1=partly occluded, 2=fully occluded, 3=unknown
-            alpha = float(line_parts[3])  # object observation angle [-pi..pi]
-            # xmin, ymin, xmax, ymax
-            bbox = np.array([float(line_parts[4]), float(line_parts[5]), float(line_parts[6]), float(line_parts[7])])
-            # height, width, length (h, w, l)
-            h, w, l = float(line_parts[8]), float(line_parts[9]), float(line_parts[10])
-            # location (x,y,z) in camera coord.
-            x, y, z = float(line_parts[11]), float(line_parts[12]), float(line_parts[13])
-            ry = float(line_parts[14])  # yaw angle (around Y-axis in camera coordinates) [-pi..pi]
+        label_file = os.path.join(self.label_dir, '{:06d}.xml'.format(idx))
+        tree = parse(label_file)
+        root = tree.getroot()
 
-            object_label = [cat_id, x, y, z, h, w, l, ry]
+        objects = root.findall('object')
+        names = [x.findtext('name') for x in objects]
+        robndbox = [x.find('robndbox') for x in objects]
+        bndbox = [x.find('bndbox') for x in objects]
+        img_labels = []
+        labels = []
+        for obj in objects:
+            name = obj.findtext('name')
+            robndbox = obj.find('robndbox')
+            if robndbox is None:
+                bndbox = obj.find('bndbox')
+                xmin = float(bndbox.findtext('xmin'))
+                ymin = float(bndbox.findtext('ymin'))
+                xmax = float(bndbox.findtext('xmax'))
+                ymax = float(bndbox.findtext('ymax'))
+                if (xmin >= cnf.BEV_WIDTH):
+                    xmin -= cnf.BEV_WIDTH
+                    xmax -= cnf.BEV_WIDTH
+                label = [int(cnf.CLASS_NAME_TO_ID[name]), (xmin+xmax)/2., (ymin+ymax)/2., xmax-xmin, ymax-ymin, 0.0]
+                img_labels.append(label)
+                
+            else:
+                cx = float(robndbox.findtext('cx'))
+                cy = float(robndbox.findtext('cy'))
+                w = float(robndbox.findtext('w'))
+                h = float(robndbox.findtext('h'))
+                if (cx-w/2. >= cnf.BEV_WIDTH):
+                    cx -= cnf.BEV_WIDTH
+                angle = float(robndbox.findtext('angle'))
+                label = [int(cnf.CLASS_NAME_TO_ID[name]), cx, cy, w, h, angle]
+                img_labels.append(label)
+        
+        # Convert from image coodi to lidar coodi
+        for img_label in img_labels:
+            [cls_id, cx, cy, w, h, angle] = img_label
+            x = (cnf.BEV_HEIGHT-cy)*cnf.DISCRETIZATION
+            y = -(cx - float(cnf.BEV_HEIGHT)/2.)*cnf.DISCRETIZATION
+            if cls_id == 0 or cls_id == 2: # Pedestrian, Cyclist
+                height = 1.73
+            else: # Car
+                height = 1.56
+            z = height / 2.
+            width = w*cnf.DISCRETIZATION
+            length = h*cnf.DISCRETIZATION
+            ry = -angle
+            object_label = [cls_id, x, y, z, height, width, length, ry]
             labels.append(object_label)
 
         if len(labels) == 0:
@@ -162,7 +192,6 @@ class VelosterDataset(Dataset):
         else:
             labels = np.array(labels, dtype=np.float32)
             has_labels = True
-
         return labels, has_labels
 
     def build_targets(self, labels, hflipped):
@@ -258,15 +287,13 @@ class VelosterDataset(Dataset):
         sample_id = int(self.sample_id_list[index])
         img_path, img_rgb = self.get_image(sample_id)
         lidarData = self.get_lidar(sample_id)
-        calib = self.get_calib(sample_id)
+        # calib = self.get_calib(sample_id)
         labels, has_labels = self.get_label(sample_id)
-        if has_labels:
-            labels[:, 1:] = transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0, calib.P2)
 
         if self.lidar_aug:
             lidarData, labels[:, 1:] = self.lidar_aug(lidarData, labels[:, 1:])
 
-        lidarData, labels = get_filtered_lidar(lidarData, cnf.boundary, labels)
+        lidarData = get_filtered_lidar(lidarData, cnf.boundary)
         bev_map = makeBEVMap(lidarData, cnf.boundary)
 
         return bev_map, labels, img_rgb, img_path
@@ -275,7 +302,7 @@ class VelosterDataset(Dataset):
 if __name__ == '__main__':
     from easydict import EasyDict as edict
     from data_process.transformation import OneOf, Random_Scaling, Random_Rotation, lidar_to_camera_box
-    from utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_boxes
+    from utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_boxes, show_rgb_image_with_boxes_matrix
 
     configs = edict()
     configs.distributed = False  # For testing
@@ -298,10 +325,12 @@ if __name__ == '__main__':
 
     print('\n\nPress n to see the next sample >>> Press Esc to quit...')
     for idx in range(len(dataset)):
+        # if (idx != 0):
+        #     continue
         bev_map, labels, img_rgb, img_path = dataset.draw_img_with_label(idx)
-        calib = Calibration(img_path.replace(".png", ".txt").replace("image_2", "calib"))
         bev_map = (bev_map.transpose(1, 2, 0) * 255).astype(np.uint8)
         bev_map = cv2.resize(bev_map, (cnf.BEV_HEIGHT, cnf.BEV_WIDTH))
+        
 
         for box_idx, (cls_id, x, y, z, h, w, l, yaw) in enumerate(labels):
             # Draw rotated box
@@ -315,9 +344,8 @@ if __name__ == '__main__':
         # Rotate the bev_map
         bev_map = cv2.rotate(bev_map, cv2.ROTATE_180)
 
-        labels[:, 1:] = lidar_to_camera_box(labels[:, 1:], calib.V2C, calib.R0, calib.P2)
         img_rgb = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-        img_rgb = show_rgb_image_with_boxes(img_rgb, labels, calib)
+        img_rgb = show_rgb_image_with_boxes_matrix(img_rgb, labels, cnf.Tr_velo_to_cam)
 
         out_img = merge_rgb_to_bev(img_rgb, bev_map, output_width=configs.output_width)
         cv2.imshow('bev_map', out_img)
