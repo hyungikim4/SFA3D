@@ -17,7 +17,7 @@ import numpy as np
 from torch.utils.data import Dataset
 if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-sys.path.append('/home/khg/Python_proj/Super-Fast-Accurate-3D-Object-Detection')
+sys.path.append('/home/khg/Python_proj/SFA3D')
 import cv2
 import torch
 
@@ -268,7 +268,6 @@ class KittiDataset(Dataset):
 
         lidarData, labels = get_filtered_lidar(lidarData, cnf.boundary, labels)
         bev_map = makeBEVMap(lidarData, cnf.boundary)
-
         return bev_map, labels, img_rgb, img_path
 
 

@@ -46,7 +46,7 @@ class VelosterDataset(Dataset):
         self.lidar_aug = lidar_aug
         self.hflip_prob = hflip_prob
 
-        self.image_dir = os.path.join(self.dataset_dir, sub_folder, "image_2")
+        self.image_dir = os.path.join(self.dataset_dir, sub_folder, "front_bev")
         self.lidar_dir = os.path.join(self.dataset_dir, sub_folder, "lidar")
         self.calib_dir = os.path.join(self.dataset_dir, sub_folder, "calib")
         self.label_dir = os.path.join(self.dataset_dir, sub_folder, "front_label")
@@ -287,14 +287,14 @@ if __name__ == '__main__':
     configs.num_classes = 3
     configs.output_width = 608
 
-    configs.dataset_dir = os.path.join('../../', 'dataset', 'kitti')
+    configs.dataset_dir = os.path.join('../../', 'dataset', 'veloster')
     # lidar_aug = OneOf([
     #     Random_Rotation(limit_angle=np.pi / 4, p=1.),
     #     Random_Scaling(scaling_range=(0.95, 1.05), p=1.),
     # ], p=1.)
     lidar_aug = None
 
-    dataset = KittiDataset(configs, mode='val', lidar_aug=lidar_aug, hflip_prob=0., num_samples=configs.num_samples)
+    dataset = VelosterDataset(configs, mode='train', lidar_aug=lidar_aug, hflip_prob=0., num_samples=configs.num_samples)
 
     print('\n\nPress n to see the next sample >>> Press Esc to quit...')
     for idx in range(len(dataset)):
