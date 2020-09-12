@@ -87,11 +87,11 @@ class VelosterDataset(Dataset):
         sample_id = int(self.sample_id_list[index])
         img_path = os.path.join(self.image_dir, '{:06d}.png'.format(sample_id))
         lidarData = self.get_lidar(sample_id)
-        calib = self.get_calib(sample_id)
+        # calib = self.get_calib(sample_id)
         # [cat_id, x, y, z, h, w, l, ry]
         labels, has_labels = self.get_label(sample_id)
-        if has_labels:
-            labels[:, 1:] = transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0, calib.P2)
+        # if has_labels:
+        #     labels[:, 1:] = transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0, calib.P2)
 
         if self.lidar_aug:
             lidarData, labels[:, 1:] = self.lidar_aug(lidarData, labels[:, 1:])

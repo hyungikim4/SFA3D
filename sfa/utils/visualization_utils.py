@@ -27,6 +27,12 @@ def roty(angle):
     return np.array([[c, 0, s],
                      [0, 1, 0],
                      [-s, 0, c]])
+def rotz(angle):
+    c = np.cos(angle)
+    s = np.sin(angle)
+    return np.array([[c, -s, 0],
+                     [s, c, 0],
+                     [0, 0, 1]])
 
 
 def compute_box_3d(dim, location, ry):
@@ -45,6 +51,21 @@ def compute_box_3d(dim, location, ry):
     corners_3d = corners_3d + np.array(location, dtype=np.float32).reshape(3, 1)
     return corners_3d.transpose(1, 0)
 
+def compute_box_3d_velo(dim, location, ry):
+    # dim: 3
+    # location: 3
+    # ry: 1
+    # return: 8 x 3
+    R = rotz(ry)
+    h, w, l = dim
+    x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
+    y_corners = [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2]
+    z_corners = [h/2, h/2, h/2, h/2, -h/2, -h/2, -h/2, -h/2]
+
+    corners = np.array([x_corners, y_corners, z_corners], dtype=np.float32)
+    corners_3d = np.dot(R, corners)
+    corners_3d = corners_3d + np.array(location, dtype=np.float32).reshape(3, 1)
+    return corners_3d
 
 def project_to_image(pts_3d, P):
     # pts_3d: n x 3
@@ -54,6 +75,15 @@ def project_to_image(pts_3d, P):
     pts_2d = np.dot(P, pts_3d_homo.transpose(1, 0)).transpose(1, 0)
     pts_2d = pts_2d[:, :2] / pts_2d[:, 2:]
 
+    return pts_2d.astype(np.int)
+
+def project_to_image_velo(pts_3d, P):
+    # pts_3d: n x 3
+    # P: 3 x 4
+    # return: n x 2
+    pts_3d_homo = np.concatenate([pts_3d, np.ones((1, pts_3d.shape[1]), dtype=np.float32)], axis=0)
+    pts_2d = np.dot(P, pts_3d_homo).transpose(1, 0)
+    pts_2d = pts_2d[:, :2] / pts_2d[:, 2:]
     return pts_2d.astype(np.int)
 
 
@@ -125,6 +155,20 @@ def show_rgb_image_with_boxes(img, labels, calib):
             continue
         corners_3d = compute_box_3d(dim, location, ry)
         corners_2d = project_to_image(corners_3d, calib.P2)
+        img = draw_box_3d(img, corners_2d, color=cnf.colors[int(cls_id)])
+
+    return img
+
+def show_rgb_image_with_boxes_matrix(img, labels, projection_matrix):
+    for box_idx, label in enumerate(labels):
+        cls_id, location, dim, ry = label[0], label[1:4], label[4:7], label[7]
+
+        if location[0] < 2.0:  # The object is too close to the camera, ignore it during visualization
+            continue
+        if cls_id < 0:
+            continue
+        corners_3d = compute_box_3d_velo(dim, location, ry)
+        corners_2d = project_to_image_velo(corners_3d, projection_matrix)
         img = draw_box_3d(img, corners_2d, color=cnf.colors[int(cls_id)])
 
     return img

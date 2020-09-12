@@ -19,7 +19,7 @@ def parse_train_configs():
     parser = argparse.ArgumentParser(description='The Implementation using PyTorch')
     parser.add_argument('--seed', type=int, default=2020,
                         help='re-produce the results with seed random')
-    parser.add_argument('--saved_fn', type=str, default='fpn_resnet_18', metavar='FN',
+    parser.add_argument('--saved_fn', type=str, default='veloster_test', metavar='FN',
                         help='The name using for saving logs, models,...')
 
     parser.add_argument('--root-dir', type=str, default='../', metavar='PATH',
@@ -43,7 +43,7 @@ def parse_train_configs():
                         help='Take a subset of the dataset to run and debug')
     parser.add_argument('--num_workers', type=int, default=4,
                         help='Number of threads for loading data')
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=3,
                         help='mini-batch size (default: 16), this is the total'
                              'batch size of all GPUs on the current node when using'
                              'Data Parallel or Distributed Data Parallel')
@@ -51,7 +51,7 @@ def parse_train_configs():
                         help='print frequency (default: 50)')
     parser.add_argument('--tensorboard_freq', type=int, default=50, metavar='N',
                         help='frequency of saving tensorboard (default: 50)')
-    parser.add_argument('--checkpoint_freq', type=int, default=2, metavar='N',
+    parser.add_argument('--checkpoint_freq', type=int, default=50, metavar='N',
                         help='frequency of saving checkpoints (default: 5)')
     ####################################################################
     ##############     Training strategy            ####################
@@ -145,7 +145,7 @@ def parse_train_configs():
     ####################################################################
     ############## Dataset, logs, Checkpoints dir ######################
     ####################################################################
-    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', 'kitti')
+    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', 'veloster')
     configs.checkpoints_dir = os.path.join(configs.root_dir, 'checkpoints', configs.saved_fn)
     configs.logs_dir = os.path.join(configs.root_dir, 'logs', configs.saved_fn)
 
