@@ -298,11 +298,128 @@ class VelosterDataset(Dataset):
 
         return bev_map, labels, img_rgb, img_path
 
+# ROS
+import rospy
+from visualization_msgs.msg import MarkerArray, Marker
+from jsk_recognition_msgs.msg import BoundingBoxArray, BoundingBox
+from sensor_msgs.msg import PointCloud2, PointField
+import sensor_msgs.point_cloud2 as pc2
+
+def euler_to_quaternion(roll, pitch, yaw):
+    qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+    qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
+    qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
+    qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+
+    return [qx, qy, qz, qw]
+
+def quaternion_to_euler(quat):
+    x = quat[0]
+    y = quat[1]
+    z = quat[2]
+    w = quat[3]
+
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    roll = math.atan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    pitch = math.asin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    yaw = math.atan2(t3, t4)
+
+    return roll, pitch, yaw
+
+def npy2pointcloud2_msg(cloud, stamp, frame_id):
+    pc2_msg = PointCloud2()
+    pc2_msg.header.stamp = stamp
+    pc2_msg.header.frame_id = frame_id
+    lidar = []
+    for i in range(cloud.shape[0]):
+        lidar.append(list(cloud[i,:3]))
+    pc2_msg2 = pc2.create_cloud_xyz32(pc2_msg.header, lidar)
+    return pc2_msg2
+
+def labels2Marker_msg(labels, stamp, frame_id):
+    marker_id = 0
+    obj_marker_arr = MarkerArray()
+    for label in labels:
+        cls_id, x, y, z, h, w, l, yaw = label
+        obj_marker = Marker()
+        obj_marker.header.stamp = stamp
+        obj_marker.header.frame_id = frame_id
+        obj_marker.lifetime = rospy.Duration(1.)
+        obj_marker.type = Marker.MESH_RESOURCE
+        obj_marker.action = Marker.ADD
+        obj_marker.mesh_use_embedded_materials = False
+        obj_marker.pose.position.x = x
+        obj_marker.pose.position.y = y
+        obj_marker.pose.position.z = z
+        [qx,qy,qz,qw] = euler_to_quaternion(0,0,yaw)
+        obj_marker.pose.orientation.x = qx
+        obj_marker.pose.orientation.y = qy
+        obj_marker.pose.orientation.z = qz
+        obj_marker.pose.orientation.w = qw
+
+        obj_marker.color.r = 0.
+        obj_marker.color.g = 1.
+        obj_marker.color.b = 0.
+        obj_marker.color.a = 0.3
+        obj_marker.id = marker_id
+
+        obj_marker.scale.x = 1
+        obj_marker.scale.y = 1
+        obj_marker.scale.z = 1
+        obj_marker.mesh_resource = "file:///home/khg/Python_proj/GRIP/dae_models/box.dae"
+
+        marker_id += 1
+        obj_marker_arr.markers.append(obj_marker)
+    return obj_marker_arr
+
+def labels2Bboxes_msg(labels, stamp, frame_id):
+    bboxes = BoundingBoxArray()
+    bboxes.header.stamp = stamp
+    bboxes.header.frame_id = frame_id
+    for label in labels:
+        cls_id, x, y, z, h, w, l, yaw = label
+        bbox = BoundingBox()
+        bbox.header.stamp = stamp
+        bbox.header.frame_id = frame_id
+        
+        bbox.pose.position.x = x
+        bbox.pose.position.y = y
+        bbox.pose.position.z = z
+        [qx,qy,qz,qw] = euler_to_quaternion(0,0,yaw)
+        bbox.pose.orientation.x = qx
+        bbox.pose.orientation.y = qy
+        bbox.pose.orientation.z = qz
+        bbox.pose.orientation.w = qw
+
+        bbox.dimensions.x = l
+        bbox.dimensions.y = w
+        bbox.dimensions.z = h
+        bbox.label = int(cls_id)
+
+        bboxes.boxes.append(bbox)
+    return bboxes
+        
+
 
 if __name__ == '__main__':
     from easydict import EasyDict as edict
     from data_process.transformation import OneOf, Random_Scaling, Random_Rotation, lidar_to_camera_box
     from utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_boxes, show_rgb_image_with_boxes_matrix
+
+
+    rospy.init_node('GRIP_trajectory_inference')
+    bboxes_pub = rospy.Publisher("/detection/bboxes", BoundingBoxArray, queue_size=1)
+    # detection_marker_pub = rospy.Publisher("/detection/markers", MarkerArray, queue_size=1)
+    lidar_pub = rospy.Publisher("/velodyne_points", PointCloud2, queue_size=1)
+    rate = rospy.Rate(10) # 10hz
 
     configs = edict()
     configs.distributed = False  # For testing
@@ -322,7 +439,7 @@ if __name__ == '__main__':
     lidar_aug = None
 
     dataset = VelosterDataset(configs, mode='train', lidar_aug=lidar_aug, hflip_prob=0., num_samples=configs.num_samples)
-
+    
     print('\n\nPress n to see the next sample >>> Press Esc to quit...')
     for idx in range(len(dataset)):
         # if (idx != 0):
@@ -330,8 +447,12 @@ if __name__ == '__main__':
         bev_map, labels, img_rgb, img_path = dataset.draw_img_with_label(idx)
         bev_map = (bev_map.transpose(1, 2, 0) * 255).astype(np.uint8)
         bev_map = cv2.resize(bev_map, (cnf.BEV_HEIGHT, cnf.BEV_WIDTH))
-        
 
+        lidar_path = img_path.replace(".png", ".npy").replace("front_image", "lidar")
+        lidar_cloud = np.load(lidar_path)
+        lidar_msg = npy2pointcloud2_msg(lidar_cloud, rospy.Time.now(), 'base_link')
+        # markers_msg = labels2Marker_msg(labels, rospy.Time.now(), 'base_link')
+        bboxes_msg = labels2Bboxes_msg(labels, rospy.Time.now(), 'base_link')
         for box_idx, (cls_id, x, y, z, h, w, l, yaw) in enumerate(labels):
             # Draw rotated box
             yaw = -yaw
@@ -349,6 +470,9 @@ if __name__ == '__main__':
 
         out_img = merge_rgb_to_bev(img_rgb, bev_map, output_width=configs.output_width)
         cv2.imshow('bev_map', out_img)
-
+        
+        lidar_pub.publish(lidar_msg)
+        # detection_marker_pub.publish(markers_msg)
+        bboxes_pub.publish(bboxes_msg)
         if cv2.waitKey(0) & 0xff == 27:
             break
