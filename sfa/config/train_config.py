@@ -19,7 +19,7 @@ def parse_train_configs():
     parser = argparse.ArgumentParser(description='The Implementation using PyTorch')
     parser.add_argument('--seed', type=int, default=2020,
                         help='re-produce the results with seed random')
-    parser.add_argument('--saved_fn', type=str, default='veloster_test', metavar='FN',
+    parser.add_argument('--saved_fn', type=str, default='veloster_test2', metavar='FN',
                         help='The name using for saving logs, models,...')
 
     parser.add_argument('--root-dir', type=str, default='../', metavar='PATH',
@@ -29,7 +29,7 @@ def parse_train_configs():
     ####################################################################
     parser.add_argument('--arch', type=str, default='fpn_resnet_18', metavar='ARCH',
                         help='The name of the model architecture')
-    parser.add_argument('--pretrained_path', type=str, default=None, metavar='PATH',
+    parser.add_argument('--pretrained_path', type=str, default="/home/khg/Python_proj/SFA3D/checkpoints/kitti_fpn_resnet_18/fpn_resnet_18_epoch_300.pth", metavar='PATH',
                         help='the path of the pretrained checkpoint')
 
     ####################################################################
@@ -91,7 +91,7 @@ def parse_train_configs():
                         help='url used to set up distributed training')
     parser.add_argument('--dist-backend', default='nccl', type=str,
                         help='distributed backend')
-    parser.add_argument('--gpu_idx', default=None, type=int,
+    parser.add_argument('--gpu_idx', default=0, type=int,
                         help='GPU index to use.')
     parser.add_argument('--no_cuda', action='store_true',
                         help='If true, cuda is not used.')

@@ -27,13 +27,13 @@ sys.path.append('./')
 sys.path.append('/home/khg/Python_proj/SFA3D')
 from sfa.models.model_utils import create_model
 from sfa.utils.evaluation_utils import draw_predictions, convert_det_to_real_values
-import sfa.config.kitti_config as cnf
 from sfa.data_process.transformation import lidar_to_camera_box
 from sfa.utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_boxes
 from sfa.data_process.kitti_data_utils import Calibration
 from sfa.utils.demo_utils import parse_demo_configs, do_detect, download_and_unzip, write_credit, do_detect_2sides
 from sfa.data_process.kitti_bev_utils import makeBEVMap
-import sfa.config.kitti_config as cnf
+# import sfa.config.kitti_config as cnf
+import sfa.config.veloster_config as cnf
 from sfa.data_process.kitti_data_utils import get_filtered_lidar
 
 ID_TO_CLASS_NAME = {
@@ -80,8 +80,8 @@ class SFA3D():
         rospack = rospkg.RosPack()
         package_path = rospack.get_path('super_fast_object_detection')
         configs = parse_demo_configs()
-        configs.pretrained_path = package_path + '/checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
-        # configs.pretrained_path = '/home/khg/Python_proj/SFA3D/test_checkpoints/Model_veloster_test_epoch_1000.pth'
+        # configs.pretrained_path = package_path + '/checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
+        configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_test2/Model_veloster_test2_epoch_1000.pth'
         model = create_model(configs)
         print('\n\n' + '-*=' * 30 + '\n\n')
         assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
