@@ -7,7 +7,6 @@
 -----------------------------------------------------------------------------------
 # Description: This script for the KITTI dataset
 """
-
 import sys
 import os
 import math
@@ -133,42 +132,30 @@ class VelosterDataset(Dataset):
         # return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
         return np.load(lidar_file).reshape(-1, 4)
 
+    # https://github.com/zexihan/labelImg-kitti
     def get_label(self, idx):
-        label_file = os.path.join(self.label_dir, '{:06d}.xml'.format(idx))
-        tree = parse(label_file)
-        root = tree.getroot()
+        label_file = os.path.join(self.label_dir, '{:06d}.txt'.format(idx))
 
-        objects = root.findall('object')
-        names = [x.findtext('name') for x in objects]
-        robndbox = [x.find('robndbox') for x in objects]
-        bndbox = [x.find('bndbox') for x in objects]
-        img_labels = []
+        f = open(label_file)
+        lines = f.readlines()
+        f.close()
+        
         labels = []
-        for obj in objects:
-            name = obj.findtext('name')
-            robndbox = obj.find('robndbox')
-            if robndbox is None:
-                bndbox = obj.find('bndbox')
-                xmin = float(bndbox.findtext('xmin'))
-                ymin = float(bndbox.findtext('ymin'))
-                xmax = float(bndbox.findtext('xmax'))
-                ymax = float(bndbox.findtext('ymax'))
-                if (xmin >= cnf.BEV_WIDTH):
-                    xmin -= cnf.BEV_WIDTH
-                    xmax -= cnf.BEV_WIDTH
-                label = [int(cnf.CLASS_NAME_TO_ID[name]), (xmin+xmax)/2., (ymin+ymax)/2., xmax-xmin, ymax-ymin, 0.0]
-                img_labels.append(label)
-                
-            else:
-                cx = float(robndbox.findtext('cx'))
-                cy = float(robndbox.findtext('cy'))
-                w = float(robndbox.findtext('w'))
-                h = float(robndbox.findtext('h'))
-                if (cx-w/2. >= cnf.BEV_WIDTH):
-                    cx -= cnf.BEV_WIDTH
-                angle = float(robndbox.findtext('angle'))
-                label = [int(cnf.CLASS_NAME_TO_ID[name]), cx, cy, w, h, angle]
-                img_labels.append(label)
+        img_labels = []
+        for line in lines:
+            string_values = line.split(' ')
+            cls_id = int(string_values[0])
+            cx = float(string_values[1])
+            cy = float(string_values[2])
+            w = float(string_values[3])
+            h = float(string_values[4])
+            yaw = float(string_values[5])
+
+            if (cx >= cnf.BEV_WIDTH):
+                cx -= cnf.BEV_WIDTH
+                cx -= cnf.BEV_WIDTH
+            label = [cls_id, cx, cy, w, h, yaw]
+            img_labels.append(label)
         
         # Convert from image coodi to lidar coodi
         for img_label in img_labels:
@@ -193,6 +180,68 @@ class VelosterDataset(Dataset):
             labels = np.array(labels, dtype=np.float32)
             has_labels = True
         return labels, has_labels
+    
+    # # https://github.com/cgvict/roLabelImg
+    # def get_label(self, idx):
+    #     label_file = os.path.join(self.label_dir, '{:06d}.xml'.format(idx))
+    #     tree = parse(label_file)
+    #     root = tree.getroot()
+
+    #     objects = root.findall('object')
+    #     names = [x.findtext('name') for x in objects]
+    #     robndbox = [x.find('robndbox') for x in objects]
+    #     bndbox = [x.find('bndbox') for x in objects]
+    #     img_labels = []
+    #     labels = []
+    #     for obj in objects:
+    #         name = obj.findtext('name')
+    #         robndbox = obj.find('robndbox')
+    #         if robndbox is None:
+    #             bndbox = obj.find('bndbox')
+    #             xmin = float(bndbox.findtext('xmin'))
+    #             ymin = float(bndbox.findtext('ymin'))
+    #             xmax = float(bndbox.findtext('xmax'))
+    #             ymax = float(bndbox.findtext('ymax'))
+    #             if (xmin >= cnf.BEV_WIDTH):
+    #                 xmin -= cnf.BEV_WIDTH
+    #                 xmax -= cnf.BEV_WIDTH
+    #             label = [int(cnf.CLASS_NAME_TO_ID[name]), (xmin+xmax)/2., (ymin+ymax)/2., xmax-xmin, ymax-ymin, 0.0]
+    #             img_labels.append(label)
+                
+    #         else:
+    #             cx = float(robndbox.findtext('cx'))
+    #             cy = float(robndbox.findtext('cy'))
+    #             w = float(robndbox.findtext('w'))
+    #             h = float(robndbox.findtext('h'))
+    #             if (cx-w/2. >= cnf.BEV_WIDTH):
+    #                 cx -= cnf.BEV_WIDTH
+    #             angle = float(robndbox.findtext('angle'))
+    #             label = [int(cnf.CLASS_NAME_TO_ID[name]), cx, cy, w, h, angle]
+    #             img_labels.append(label)
+        
+    #     # Convert from image coodi to lidar coodi
+    #     for img_label in img_labels:
+    #         [cls_id, cx, cy, w, h, angle] = img_label
+    #         x = (cnf.BEV_HEIGHT-cy)*cnf.DISCRETIZATION
+    #         y = -(cx - float(cnf.BEV_HEIGHT)/2.)*cnf.DISCRETIZATION
+    #         if cls_id == 0 or cls_id == 2: # Pedestrian, Cyclist
+    #             height = 1.73
+    #         else: # Car
+    #             height = 1.56
+    #         z = height / 2.
+    #         width = w*cnf.DISCRETIZATION
+    #         length = h*cnf.DISCRETIZATION
+    #         ry = -angle
+    #         object_label = [cls_id, x, y, z, height, width, length, ry]
+    #         labels.append(object_label)
+
+    #     if len(labels) == 0:
+    #         labels = np.zeros((1, 8), dtype=np.float32)
+    #         has_labels = False
+    #     else:
+    #         labels = np.array(labels, dtype=np.float32)
+    #         has_labels = True
+    #     return labels, has_labels
 
     def build_targets(self, labels, hflipped):
         minX = cnf.boundary['minX']
@@ -307,6 +356,7 @@ if __name__ == '__main__':
     from utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_boxes, show_rgb_image_with_boxes_matrix
 
     # ROS
+    sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
     import rospy
     from visualization_msgs.msg import MarkerArray, Marker
     from jsk_recognition_msgs.msg import BoundingBoxArray, BoundingBox
@@ -415,7 +465,7 @@ if __name__ == '__main__':
             bboxes.boxes.append(bbox)
         return bboxes
             
-    rospy.init_node('GRIP_trajectory_inference')
+    rospy.init_node('veloster_dataset')
     bboxes_pub = rospy.Publisher("/detection/bboxes", BoundingBoxArray, queue_size=1)
     # detection_marker_pub = rospy.Publisher("/detection/markers", MarkerArray, queue_size=1)
     lidar_pub = rospy.Publisher("/velodyne_points", PointCloud2, queue_size=1)
@@ -445,6 +495,9 @@ if __name__ == '__main__':
         # if (idx != 0):
         #     continue
         bev_map, labels, img_rgb, img_path = dataset.draw_img_with_label(idx)
+        img_h, img_w, img_c = img_rgb.shape
+        img_w_uint = int(img_w/7)
+        img_rgb = img_rgb[:,img_w_uint*2:img_w_uint*5,:]
         bev_map = (bev_map.transpose(1, 2, 0) * 255).astype(np.uint8)
         bev_map = cv2.resize(bev_map, (cnf.BEV_HEIGHT, cnf.BEV_WIDTH))
 
