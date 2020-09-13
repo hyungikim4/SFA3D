@@ -2,6 +2,7 @@
 import sensor_msgs.point_cloud2 as pc2
 from sensor_msgs.msg import PointCloud2
 from autoware_msgs.msg import DetectedObjectArray, DetectedObject
+from jsk_recognition_msgs.msg import BoundingBoxArray, BoundingBox
 import rospy
 import rospkg
 import numpy as np
@@ -23,7 +24,7 @@ import cv2
 import torch
 
 sys.path.append('./')
-sys.path.append('/home/usrg/python_ws/Super-Fast-Accurate-3D-Object-Detection')
+sys.path.append('/home/khg/Python_proj/SFA3D')
 from sfa.models.model_utils import create_model
 from sfa.utils.evaluation_utils import draw_predictions, convert_det_to_real_values
 import sfa.config.kitti_config as cnf
@@ -80,6 +81,7 @@ class SFA3D():
         package_path = rospack.get_path('super_fast_object_detection')
         configs = parse_demo_configs()
         configs.pretrained_path = package_path + '/checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
+        # configs.pretrained_path = '/home/khg/Python_proj/SFA3D/test_checkpoints/Model_veloster_test_epoch_1000.pth'
         model = create_model(configs)
         print('\n\n' + '-*=' * 30 + '\n\n')
         assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
@@ -91,8 +93,9 @@ class SFA3D():
         self.configs = configs
         self.model.eval()
         
+        self.bboxes_pub = rospy.Publisher('/detection/bboxes', BoundingBoxArray, queue_size=1)
         self.detection_pub = rospy.Publisher('detected_objects', DetectedObjectArray, queue_size=1)
-        self.velo_sub = rospy.Subscriber("/kitti/velo/pointcloud", PointCloud2, self.velo_callback, queue_size=1) # "/kitti/velo/pointcloud"
+        self.velo_sub = rospy.Subscriber("/transformed_pointcloud", PointCloud2, self.velo_callback, queue_size=1) # "/kitti/velo/pointcloud"
         print("Started Node")
 
 
@@ -139,6 +142,9 @@ class SFA3D():
         objects_msg = DetectedObjectArray()
         objects_msg.header.stamp = rospy.Time.now()
         objects_msg.header.frame_id = scan.header.frame_id
+        bboxes_msg = BoundingBoxArray()
+        bboxes_msg.header.stamp = rospy.Time.now()
+        bboxes_msg.header.frame_id = scan.header.frame_id
         flag = False
         for j in range(self.configs.num_classes):
             class_name = ID_TO_CLASS_NAME[j]
@@ -153,6 +159,8 @@ class SFA3D():
                     z = _z + cnf.boundary['minZ']
                     w = _w / cnf.BEV_WIDTH * cnf.bound_size_y
                     l = _l / cnf.BEV_HEIGHT * cnf.bound_size_x
+
+                    # Autoware detected objects
                     obj = DetectedObject()
                     obj.header.stamp = rospy.Time.now()
                     obj.header.frame_id = scan.header.frame_id
@@ -176,6 +184,26 @@ class SFA3D():
                     obj.dimensions.y = w
                     obj.dimensions.z = _h
                     objects_msg.objects.append(obj)
+
+                    # Boundinb boxes
+                    bbox = BoundingBox()
+                    bbox.header.stamp = rospy.Time.now()
+                    bbox.header.frame_id = scan.header.frame_id
+
+                    bbox.label = j
+                    bbox.pose.position.x = x
+                    bbox.pose.position.y = y
+                    bbox.pose.position.z = z
+                    [qx, qy, qz, qw] = euler_to_quaternion(yaw, 0, 0)
+                    bbox.pose.orientation.x = qx
+                    bbox.pose.orientation.y = qy
+                    bbox.pose.orientation.z = qz
+                    bbox.pose.orientation.w = qw
+                    
+                    bbox.dimensions.x = l
+                    bbox.dimensions.y = w
+                    bbox.dimensions.z = _h
+                    bboxes_msg.boxes.append(bbox)
 
             # if len(back_detections[j]) > 0:
             #     for det in back_detections[j]:
@@ -210,6 +238,7 @@ class SFA3D():
             #         obj.dimensions.z = _h
             #         objects_msg.objects.append(obj)
         self.detection_pub.publish(objects_msg)
+        self.bboxes_pub.publish(bboxes_msg)
             
         stop = timeit.default_timer()
         print('Time: ', stop - start)
