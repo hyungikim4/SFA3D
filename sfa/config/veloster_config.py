@@ -20,11 +20,37 @@ colors = [[0, 255, 255], [0, 0, 255], [255, 0, 0], [255, 120, 0],
           [255, 120, 120], [0, 120, 0], [120, 255, 255], [120, 0, 255]]
 
 #####################################################################################
+# boundary = {
+#     "minX": 0,
+#     "maxX": 50,
+#     "minY": -25,
+#     "maxY": 25,
+#     "minZ": -0.50,
+#     "maxZ": 3.50
+# }
+
+# bound_size_x = boundary['maxX'] - boundary['minX']
+# bound_size_y = boundary['maxY'] - boundary['minY']
+# bound_size_z = boundary['maxZ'] - boundary['minZ']
+
+# boundary_back = {
+#     "minX": -50,
+#     "maxX": 0,
+#     "minY": -25,
+#     "maxY": 25,
+#     "minZ": -0.50,
+#     "maxZ": 3.50
+# }
+
+# BEV_WIDTH = 608  # across y axis -25m ~ 25m
+# BEV_HEIGHT = 608  # across x axis 0m ~ 50m
+# DISCRETIZATION = (boundary["maxX"] - boundary["minX"]) / BEV_HEIGHT
+
 boundary = {
-    "minX": 0,
-    "maxX": 50,
-    "minY": -25,
-    "maxY": 25,
+    "minX": 0.,
+    "maxX": 40.,
+    "minY": -20.,
+    "maxY": 20.,
     "minZ": -0.50,
     "maxZ": 3.50
 }
@@ -34,17 +60,17 @@ bound_size_y = boundary['maxY'] - boundary['minY']
 bound_size_z = boundary['maxZ'] - boundary['minZ']
 
 boundary_back = {
-    "minX": -50,
-    "maxX": 0,
-    "minY": -25,
-    "maxY": 25,
+    "minX": -40.,
+    "maxX": 0.,
+    "minY": -20.,
+    "maxY": 20.,
     "minZ": -0.50,
     "maxZ": 3.50
 }
 
-BEV_WIDTH = 608  # across y axis -25m ~ 25m
-BEV_HEIGHT = 608  # across x axis 0m ~ 50m
-DISCRETIZATION = (boundary["maxX"] - boundary["minX"]) / BEV_HEIGHT
+BEV_WIDTH = 416  # across y axis -25m ~ 25m
+BEV_HEIGHT = 416  # across x axis 0m ~ 50m
+DISCRETIZATION = (boundary["maxX"] - boundary["minX"]) / float(BEV_HEIGHT)
 
 # maximum number of points per voxel
 T = 35

@@ -19,7 +19,7 @@ def parse_train_configs():
     parser = argparse.ArgumentParser(description='The Implementation using PyTorch')
     parser.add_argument('--seed', type=int, default=2020,
                         help='re-produce the results with seed random')
-    parser.add_argument('--saved_fn', type=str, default='veloster_test2', metavar='FN',
+    parser.add_argument('--saved_fn', type=str, default='kitti_416_416', metavar='FN',
                         help='The name using for saving logs, models,...')
 
     parser.add_argument('--root-dir', type=str, default='../', metavar='PATH',
@@ -29,7 +29,7 @@ def parse_train_configs():
     ####################################################################
     parser.add_argument('--arch', type=str, default='fpn_resnet_18', metavar='ARCH',
                         help='The name of the model architecture')
-    parser.add_argument('--pretrained_path', type=str, default="/home/khg/Python_proj/SFA3D/checkpoints/kitti_fpn_resnet_18/fpn_resnet_18_epoch_300.pth", metavar='PATH',
+    parser.add_argument('--pretrained_path', type=str, default=None, metavar='PATH',
                         help='the path of the pretrained checkpoint')
 
     ####################################################################
@@ -43,7 +43,7 @@ def parse_train_configs():
                         help='Take a subset of the dataset to run and debug')
     parser.add_argument('--num_workers', type=int, default=4,
                         help='Number of threads for loading data')
-    parser.add_argument('--batch_size', type=int, default=3,
+    parser.add_argument('--batch_size', type=int, default=32,
                         help='mini-batch size (default: 16), this is the total'
                              'batch size of all GPUs on the current node when using'
                              'Data Parallel or Distributed Data Parallel')
@@ -119,8 +119,10 @@ def parse_train_configs():
     configs.ngpus_per_node = torch.cuda.device_count()
 
     configs.pin_memory = True
-    configs.input_size = (608, 608)
-    configs.hm_size = (152, 152)
+    # configs.input_size = (608, 608)
+    # configs.hm_size = (152, 152)
+    configs.input_size = (416, 416)
+    configs.hm_size = (104, 104)
     configs.down_ratio = 4
     configs.max_objects = 50
 
@@ -145,7 +147,7 @@ def parse_train_configs():
     ####################################################################
     ############## Dataset, logs, Checkpoints dir ######################
     ####################################################################
-    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', 'veloster')
+    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', 'kitti')
     configs.checkpoints_dir = os.path.join(configs.root_dir, 'checkpoints', configs.saved_fn)
     configs.logs_dir = os.path.join(configs.root_dir, 'logs', configs.saved_fn)
 

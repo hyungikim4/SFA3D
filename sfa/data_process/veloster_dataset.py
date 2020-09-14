@@ -153,7 +153,6 @@ class VelosterDataset(Dataset):
 
             if (cx >= cnf.BEV_WIDTH):
                 cx -= cnf.BEV_WIDTH
-                cx -= cnf.BEV_WIDTH
             label = [cls_id, cx, cy, w, h, yaw]
             img_labels.append(label)
         
@@ -495,6 +494,7 @@ if __name__ == '__main__':
         # if (idx != 0):
         #     continue
         bev_map, labels, img_rgb, img_path = dataset.draw_img_with_label(idx)
+        print(img_path)
         img_h, img_w, img_c = img_rgb.shape
         img_w_uint = int(img_w/7)
         img_rgb = img_rgb[:,img_w_uint*2:img_w_uint*5,:]

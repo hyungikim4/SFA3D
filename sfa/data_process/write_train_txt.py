@@ -3,7 +3,7 @@ import glob
 import shutil
 import sys
 
-ext = ".xml"
+ext = ".txt"
 
 # path = sys.argv[1]
 
@@ -26,7 +26,8 @@ def copy_files(path, ori_filename, save_path, save_filename, ext):
 
 for num, label_file in enumerate(label_list_ext):
 	filename = label_file[:-4]
-	
+	if (filename == "classes"):
+		continue
 	data = filename+"\n"
 	f.write(data)
 	
