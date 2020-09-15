@@ -193,11 +193,13 @@ class SFA3D():
             # detections, back_detections, bev_map, fps = do_detect_2sides(self.configs, self.model, bev_map, back_bevmap)
         print(fps)
         objects_msg = DetectedObjectArray()
-        objects_msg.header.stamp = rospy.Time.now()
-        objects_msg.header.frame_id = scan.header.frame_id
+        objects_msg.header = scan.header
+        # objects_msg.header.stamp = rospy.Time.now()
+        # objects_msg.header.frame_id = scan.header.frame_id
         bboxes_msg = BoundingBoxArray()
-        bboxes_msg.header.stamp = rospy.Time.now()
-        bboxes_msg.header.frame_id = scan.header.frame_id
+        bboxes_msg.header = scan.header
+        # bboxes_msg.header.stamp = rospy.Time.now()
+        # bboxes_msg.header.frame_id = scan.header.frame_id
         flag = False
 
         for j in range(self.configs.num_classes):
@@ -311,8 +313,8 @@ class SFA3D():
             cv2.drawContours(agents_mask, [hull], 0, (255, 0, 0), thickness=cv2.FILLED)
         raster_time = time.time()
         print('rasterization time: %.4f sec'%(raster_time-detection_time))
-        cv2.imshow('agents_mask', agents_mask)
-        cv2.waitKey(1)
+        # cv2.imshow('agents_mask', agents_mask)
+        # cv2.waitKey(1)
         self.detection_pub.publish(objects_msg)
         self.bboxes_pub.publish(bboxes_msg)
             
