@@ -109,6 +109,7 @@ def do_detect(configs, model, bevmap, is_front):
     input_bev_maps = bevmap.unsqueeze(0).to(configs.device, non_blocking=True).float()
     t1 = time_synchronized()
     outputs = model(input_bev_maps)
+
     outputs['hm_cen'] = _sigmoid(outputs['hm_cen'])
     outputs['cen_offset'] = _sigmoid(outputs['cen_offset'])
     # print(torch.max(outputs['cen_offset']))
@@ -118,6 +119,7 @@ def do_detect(configs, model, bevmap, is_front):
     # print(torch.max(outputs['cen_offset']))
     # print('-----')
     # detections size (batch_size, K, 10)
+    
     detections = decode(outputs['hm_cen'], outputs['cen_offset'], outputs['direction'], outputs['z_coor'],
                         outputs['dim'], K=configs.K)
     detections = detections.cpu().numpy().astype(np.float32)

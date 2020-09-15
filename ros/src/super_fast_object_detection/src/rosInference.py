@@ -15,6 +15,7 @@ import time
 import warnings
 import zipfile
 import ros_numpy
+import math
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -73,6 +74,27 @@ def euler_to_quaternion(yaw, pitch, roll):
     qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
     return [qx, qy, qz, qw]
 
+def quaternion_to_euler(quat):
+    x = quat[0]
+    y = quat[1]
+    z = quat[2]
+    w = quat[3]
+
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    roll = math.atan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    pitch = math.asin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    yaw = math.atan2(t3, t4)
+
+    return roll, pitch, yaw
+
 class SFA3D():
     def __init__(self):
         self.is_callback = False
@@ -81,7 +103,7 @@ class SFA3D():
         package_path = rospack.get_path('super_fast_object_detection')
         configs = parse_demo_configs()
         # configs.pretrained_path = package_path + '/checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
-        configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_test2/Model_veloster_test2_epoch_1000.pth'
+        configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_416_416/Model_veloster_416_416_epoch_1000.pth'
         model = create_model(configs)
         print('\n\n' + '-*=' * 30 + '\n\n')
         assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
@@ -95,6 +117,7 @@ class SFA3D():
         
         self.bboxes_pub = rospy.Publisher('/detection/bboxes', BoundingBoxArray, queue_size=1)
         self.detection_pub = rospy.Publisher('detected_objects', DetectedObjectArray, queue_size=1)
+        
         self.velo_sub = rospy.Subscriber("/transformed_pointcloud", PointCloud2, self.velo_callback, queue_size=1) # "/kitti/velo/pointcloud"
         print("Started Node")
 
@@ -103,11 +126,41 @@ class SFA3D():
         print('callback')
         self.is_callback = True
         self.scan = msg
-        # self.on_scan(msg)
+        self.on_scan(msg)
+    
+    def rot_z(self, yaw):
+        return np.array([[np.cos(yaw), -np.sin(yaw)],
+                        [np.sin(yaw), np.cos(yaw)]])
+
+    def get_pixel_xy(self, real_x, real_y):
+        x = int(-real_y/cnf.DISCRETIZATION)+cnf.BEV_WIDTH/2
+        y = int(-real_x/cnf.DISCRETIZATION)+cnf.BEV_HEIGHT
+        return [x,y]
+
+    def get_bev_bboxes(self, msg):
+        bev_clusters_bboxes = []
+        for bbox in msg.boxes:
+            xy = np.array([[bbox.pose.position.x],[bbox.pose.position.y]])
+            dx = bbox.dimensions.x
+            dy = bbox.dimensions.y
+            corners_bev = np.array([[dx/2., dx/2., -dx/2., -dx/2.],
+                                    [dy/2., -dy/2., dy/2., -dy/2.]])
+            quaternion = (
+                bbox.pose.orientation.x,
+                bbox.pose.orientation.y,
+                bbox.pose.orientation.z,
+                bbox.pose.orientation.w)
+            roll, pitch, yaw = quaternion_to_euler(quaternion)
+
+            rot_matrix = self.rot_z(yaw)
+            rotated_corners_bev = np.dot(rot_matrix, corners_bev)
+            corners_bev = rotated_corners_bev + xy
+            bev_clusters_bboxes.append(corners_bev.transpose())
+        return np.array(bev_clusters_bboxes)
 
     def on_scan(self, scan):
-        # if (scan is None or not self.is_callback):
-        #     return
+        if (scan is None or not self.is_callback):
+            return
         if (scan is None):
             return
         start = timeit.default_timer()
@@ -146,6 +199,7 @@ class SFA3D():
         bboxes_msg.header.stamp = rospy.Time.now()
         bboxes_msg.header.frame_id = scan.header.frame_id
         flag = False
+
         for j in range(self.configs.num_classes):
             class_name = ID_TO_CLASS_NAME[j]
 
@@ -165,8 +219,9 @@ class SFA3D():
                     obj.header.stamp = rospy.Time.now()
                     obj.header.frame_id = scan.header.frame_id
 
-                    obj.score = 0.9
+                    obj.score = _score
                     obj.pose_reliable = True
+                    obj.valid = True
                     
                     obj.space_frame = scan.header.frame_id
                     obj.label = class_name
@@ -237,6 +292,27 @@ class SFA3D():
             #         obj.dimensions.y = w
             #         obj.dimensions.z = _h
             #         objects_msg.objects.append(obj)
+        
+        # raster agent mask
+        detection_time = time.time()
+        agents_mask = np.zeros((cnf.BEV_HEIGHT, cnf.BEV_WIDTH), dtype=np.uint8)
+
+        bev_bboxes = self.get_bev_bboxes(bboxes_msg)
+        for bev_bbox in bev_bboxes:    
+            corner_2d = []
+            for i in range(len(bev_bbox)):
+                corner_2d.append(self.get_pixel_xy(bev_bbox[i][0], bev_bbox[i][1]))
+            corner_2d = np.array(corner_2d)
+            # print(corner_2d)
+            corners_2d_dim = np.expand_dims(corner_2d, axis=1)
+            corners_2d_dim = corners_2d_dim.astype(int)
+            hull = cv2.convexHull(corners_2d_dim)
+            
+            cv2.drawContours(agents_mask, [hull], 0, (255, 0, 0), thickness=cv2.FILLED)
+        raster_time = time.time()
+        print('rasterization time: %.4f sec'%(raster_time-detection_time))
+        cv2.imshow('agents_mask', agents_mask)
+        cv2.waitKey(1)
         self.detection_pub.publish(objects_msg)
         self.bboxes_pub.publish(bboxes_msg)
             
@@ -249,6 +325,6 @@ class SFA3D():
 if __name__ == '__main__':
     rospy.init_node('SuperFastObjectDetection', anonymous=True)
     sfa3d = SFA3D()
-    while not rospy.is_shutdown():
-        sfa3d.on_scan(sfa3d.scan)
+    # while not rospy.is_shutdown():
+    #     sfa3d.on_scan(sfa3d.scan)
     rospy.spin()
