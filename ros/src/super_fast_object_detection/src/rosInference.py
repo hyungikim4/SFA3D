@@ -33,8 +33,8 @@ from sfa.utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_
 from sfa.data_process.kitti_data_utils import Calibration
 from sfa.utils.demo_utils import parse_demo_configs, do_detect, download_and_unzip, write_credit, do_detect_2sides
 from sfa.data_process.kitti_bev_utils import makeBEVMap
-# import sfa.config.kitti_config as cnf
-import sfa.config.veloster_config as cnf
+import sfa.config.kitti_config as cnf
+# import sfa.config.veloster_config as cnf
 from sfa.data_process.kitti_data_utils import get_filtered_lidar
 
 ID_TO_CLASS_NAME = {
@@ -99,11 +99,12 @@ class SFA3D():
     def __init__(self):
         self.is_callback = False
         self.scan = None
+        self.conf_thres = 0.5
         rospack = rospkg.RosPack()
         package_path = rospack.get_path('super_fast_object_detection')
         configs = parse_demo_configs()
-        # configs.pretrained_path = package_path + '/checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
-        configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_416_416/Model_veloster_416_416_epoch_1000.pth'
+        configs.pretrained_path = package_path + '/checkpoints/kitti_fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
+        # configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_416_416/Model_veloster_416_416_epoch_1000.pth'
         model = create_model(configs)
         print('\n\n' + '-*=' * 30 + '\n\n')
         assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
@@ -118,7 +119,7 @@ class SFA3D():
         self.bboxes_pub = rospy.Publisher('/detection/bboxes', BoundingBoxArray, queue_size=1)
         self.detection_pub = rospy.Publisher('detected_objects', DetectedObjectArray, queue_size=1)
         
-        self.velo_sub = rospy.Subscriber("/transformed_pointcloud", PointCloud2, self.velo_callback, queue_size=1) # "/kitti/velo/pointcloud"
+        self.velo_sub = rospy.Subscriber("/kitti/velo/pointcloud", PointCloud2, self.velo_callback, queue_size=1) # "/kitti/velo/pointcloud"
         print("Started Node")
 
 
@@ -188,9 +189,9 @@ class SFA3D():
         back_bevmap = torch.from_numpy(back_bevmap)
 
         with torch.no_grad():
-            detections, bev_map, fps = do_detect(self.configs, self.model, bev_map, is_front=True)
+            # detections, bev_map, fps = do_detect(self.configs, self.model, bev_map, is_front=True)
             # back_detections, back_bevmap, _ = do_detect(self.configs, self.model, back_bevmap, is_front=False)
-            # detections, back_detections, bev_map, fps = do_detect_2sides(self.configs, self.model, bev_map, back_bevmap)
+            detections, back_detections, bev_map, fps = do_detect_2sides(self.configs, self.model, bev_map, back_bevmap)
         print(fps)
         objects_msg = DetectedObjectArray()
         objects_msg.header = scan.header
@@ -209,6 +210,8 @@ class SFA3D():
                 # flag = True
                 for det in detections[j]:
                     _score, _x, _y, _z, _h, _w, _l, _yaw = det
+                    if (_score < self.conf_thres):
+                        continue
                     yaw = -_yaw
                     x = _y / cnf.BEV_HEIGHT * cnf.bound_size_x + cnf.boundary['minX']
                     y = _x / cnf.BEV_WIDTH * cnf.bound_size_y + cnf.boundary['minY']
@@ -242,7 +245,7 @@ class SFA3D():
                     obj.dimensions.z = _h
                     objects_msg.objects.append(obj)
 
-                    # Boundinb boxes
+                    # Bounding boxes
                     bbox = BoundingBox()
                     bbox.header.stamp = rospy.Time.now()
                     bbox.header.frame_id = scan.header.frame_id
@@ -262,57 +265,79 @@ class SFA3D():
                     bbox.dimensions.z = _h
                     bboxes_msg.boxes.append(bbox)
 
-            # if len(back_detections[j]) > 0:
-            #     for det in back_detections[j]:
-            #         _score, _x, _y, _z, _h, _w, _l, _yaw = det
-            #         yaw = -_yaw
-            #         x = _y / cnf.BEV_HEIGHT * cnf.bound_size_x + cnf.boundary['minX']
-            #         y = _x / cnf.BEV_WIDTH * cnf.bound_size_y + cnf.boundary['minY']
-            #         z = _z + cnf.boundary_back['minZ']
-            #         w = _w / cnf.BEV_WIDTH * cnf.bound_size_y
-            #         l = _l / cnf.BEV_HEIGHT * cnf.bound_size_x
-            #         obj = DetectedObject()
-            #         obj.header.stamp = rospy.Time.now()
-            #         obj.header.frame_id = scan.header.frame_id
+            if len(back_detections[j]) > 0:
+                for det in back_detections[j]:
+                    _score, _x, _y, _z, _h, _w, _l, _yaw = det
+                    if (_score < self.conf_thres):
+                        continue
+                    yaw = -_yaw
+                    x = -_y / cnf.BEV_HEIGHT * cnf.bound_size_x + cnf.boundary_back['maxX']
+                    y = -_x / cnf.BEV_WIDTH * cnf.bound_size_y + cnf.boundary_back['maxY']
+                    z = _z + cnf.boundary_back['minZ']
+                    w = _w / cnf.BEV_WIDTH * cnf.bound_size_y
+                    l = _l / cnf.BEV_HEIGHT * cnf.bound_size_x
+                    obj = DetectedObject()
+                    obj.header.stamp = rospy.Time.now()
+                    obj.header.frame_id = scan.header.frame_id
 
-            #         obj.score = 0.9
-            #         obj.pose_reliable = True
+                    obj.score = 0.9
+                    obj.pose_reliable = True
                     
-            #         obj.space_frame = scan.header.frame_id
-            #         obj.label = class_name
-            #         obj.score = _score
-            #         obj.pose.position.x = -x
-            #         obj.pose.position.y = -y
-            #         obj.pose.position.z = z
-            #         [qx, qy, qz, qw] = euler_to_quaternion(yaw, 0, 0)
-            #         obj.pose.orientation.x = qx
-            #         obj.pose.orientation.y = qy
-            #         obj.pose.orientation.z = qz
-            #         obj.pose.orientation.w = qw
+                    obj.space_frame = scan.header.frame_id
+                    obj.label = class_name
+                    obj.score = _score
+                    obj.pose.position.x = -x
+                    obj.pose.position.y = -y
+                    obj.pose.position.z = z
+                    [qx, qy, qz, qw] = euler_to_quaternion(yaw, 0, 0)
+                    obj.pose.orientation.x = qx
+                    obj.pose.orientation.y = qy
+                    obj.pose.orientation.z = qz
+                    obj.pose.orientation.w = qw
                     
-            #         obj.dimensions.x = l
-            #         obj.dimensions.y = w
-            #         obj.dimensions.z = _h
-            #         objects_msg.objects.append(obj)
+                    obj.dimensions.x = l
+                    obj.dimensions.y = w
+                    obj.dimensions.z = _h
+                    objects_msg.objects.append(obj)
+
+                    # Bounding boxes
+                    bbox = BoundingBox()
+                    bbox.header.stamp = rospy.Time.now()
+                    bbox.header.frame_id = scan.header.frame_id
+
+                    bbox.label = j
+                    bbox.pose.position.x = x
+                    bbox.pose.position.y = y
+                    bbox.pose.position.z = z
+                    [qx, qy, qz, qw] = euler_to_quaternion(yaw, 0, 0)
+                    bbox.pose.orientation.x = qx
+                    bbox.pose.orientation.y = qy
+                    bbox.pose.orientation.z = qz
+                    bbox.pose.orientation.w = qw
+                    
+                    bbox.dimensions.x = l
+                    bbox.dimensions.y = w
+                    bbox.dimensions.z = _h
+                    bboxes_msg.boxes.append(bbox)
         
         # raster agent mask
-        detection_time = time.time()
-        agents_mask = np.zeros((cnf.BEV_HEIGHT, cnf.BEV_WIDTH), dtype=np.uint8)
+        # detection_time = time.time()
+        # agents_mask = np.zeros((cnf.BEV_HEIGHT, cnf.BEV_WIDTH), dtype=np.uint8)
 
-        bev_bboxes = self.get_bev_bboxes(bboxes_msg)
-        for bev_bbox in bev_bboxes:    
-            corner_2d = []
-            for i in range(len(bev_bbox)):
-                corner_2d.append(self.get_pixel_xy(bev_bbox[i][0], bev_bbox[i][1]))
-            corner_2d = np.array(corner_2d)
-            # print(corner_2d)
-            corners_2d_dim = np.expand_dims(corner_2d, axis=1)
-            corners_2d_dim = corners_2d_dim.astype(int)
-            hull = cv2.convexHull(corners_2d_dim)
+        # bev_bboxes = self.get_bev_bboxes(bboxes_msg)
+        # for bev_bbox in bev_bboxes:    
+        #     corner_2d = []
+        #     for i in range(len(bev_bbox)):
+        #         corner_2d.append(self.get_pixel_xy(bev_bbox[i][0], bev_bbox[i][1]))
+        #     corner_2d = np.array(corner_2d)
+        #     # print(corner_2d)
+        #     corners_2d_dim = np.expand_dims(corner_2d, axis=1)
+        #     corners_2d_dim = corners_2d_dim.astype(int)
+        #     hull = cv2.convexHull(corners_2d_dim)
             
-            cv2.drawContours(agents_mask, [hull], 0, (255, 0, 0), thickness=cv2.FILLED)
-        raster_time = time.time()
-        print('rasterization time: %.4f sec'%(raster_time-detection_time))
+        #     cv2.drawContours(agents_mask, [hull], 0, (255, 0, 0), thickness=cv2.FILLED)
+        # raster_time = time.time()
+        # print('rasterization time: %.4f sec'%(raster_time-detection_time))
         # cv2.imshow('agents_mask', agents_mask)
         # cv2.waitKey(1)
         self.detection_pub.publish(objects_msg)
