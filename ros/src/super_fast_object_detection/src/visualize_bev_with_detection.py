@@ -224,25 +224,22 @@ class VisualizeBevWithDetection():
         bev_map_binary = cv2.rotate(bev_map_binary, cv2.ROTATE_180)
         back_bevmap_binary = cv2.rotate(back_bevmap_binary, cv2.ROTATE_180)
 
+        all_bev_map = np.zeros((2*cnf.BEV_HEIGHT, cnf.BEV_WIDTH, 3), dtype=np.uint8)
+        all_bev_map[:cnf.BEV_HEIGHT, :, :] = bev_map_binary
+        all_bev_map[cnf.BEV_HEIGHT:, :, :] = back_bevmap_binary
+
         if self.white_background:
-            bev_map_binary = 255 - bev_map_binary
-            back_bevmap_binary = 255 - back_bevmap_binary
+            all_bev_map = 255 - all_bev_map
+        
         # Draw objects in front image
         if (detection_msg is not None):
             bev_bboxes = self.get_bev_bboxes(detection_msg)
-            bev_map_binary = self.drawObjects(bev_bboxes, bev_map_binary)
+            all_bev_map = self.drawObjects(bev_bboxes, all_bev_map)
         
         # Draw raw lidar bev with raster map
         if (self.with_map):
             rasterized_map = self.drawRasterizedMap(local_map_msg)
-            front_map = rasterized_map[:cnf.BEV_HEIGHT, :, :]
-            back_map = rasterized_map[cnf.BEV_HEIGHT:, :, :]
-            bev_map_binary = cv2.addWeighted(bev_map_binary,0.8,front_map,0.2,0)
-            back_bevmap_binary = cv2.addWeighted(back_bevmap_binary,0.8,back_map,0.2,0)
-
-        all_bev_map = np.zeros((2*cnf.BEV_HEIGHT, cnf.BEV_WIDTH, 3), dtype=np.uint8)
-        all_bev_map[:cnf.BEV_HEIGHT, :, :] = bev_map_binary
-        all_bev_map[cnf.BEV_HEIGHT:, :, :] = back_bevmap_binary
+            all_bev_map = cv2.addWeighted(all_bev_map,0.8,rasterized_map,0.2,0)
 
         # publish visualization results
         all_bev_map_msg = self.bridge.cv2_to_imgmsg(all_bev_map, "bgr8")
