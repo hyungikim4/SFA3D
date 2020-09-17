@@ -33,8 +33,8 @@ from sfa.utils.visualization_utils import merge_rgb_to_bev, show_rgb_image_with_
 from sfa.data_process.kitti_data_utils import Calibration
 from sfa.utils.demo_utils import parse_demo_configs, do_detect, download_and_unzip, write_credit, do_detect_2sides
 from sfa.data_process.kitti_bev_utils import makeBEVMap
-import sfa.config.kitti_config as cnf
-# import sfa.config.veloster_config as cnf
+# import sfa.config.kitti_config as cnf
+import sfa.config.veloster_config as cnf
 from sfa.data_process.kitti_data_utils import get_filtered_lidar
 
 ID_TO_CLASS_NAME = {
@@ -103,8 +103,8 @@ class SFA3D():
         rospack = rospkg.RosPack()
         package_path = rospack.get_path('super_fast_object_detection')
         configs = parse_demo_configs()
-        configs.pretrained_path = package_path + '/checkpoints/kitti_fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
-        # configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_416_416/Model_veloster_416_416_epoch_1000.pth'
+        # configs.pretrained_path = package_path + '/checkpoints/kitti_fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
+        configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_416_416_2/Model_veloster_416_416_2_epoch_750.pth'
         model = create_model(configs)
         print('\n\n' + '-*=' * 30 + '\n\n')
         assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
@@ -119,12 +119,12 @@ class SFA3D():
         self.bboxes_pub = rospy.Publisher('/detection/bboxes', BoundingBoxArray, queue_size=1)
         self.detection_pub = rospy.Publisher('detected_objects', DetectedObjectArray, queue_size=1)
         
-        self.velo_sub = rospy.Subscriber("/kitti/velo/pointcloud", PointCloud2, self.velo_callback, queue_size=1) # "/kitti/velo/pointcloud"
+        self.velo_sub = rospy.Subscriber("/transformed_pointcloud", PointCloud2, self.velo_callback, queue_size=1) # "/kitti/velo/pointcloud"
         print("Started Node")
 
 
     def velo_callback(self, msg):
-        print('callback')
+        # print('callback')
         self.is_callback = True
         self.scan = msg
         self.on_scan(msg)
@@ -224,7 +224,6 @@ class SFA3D():
                     obj.header.stamp = rospy.Time.now()
                     obj.header.frame_id = scan.header.frame_id
 
-                    obj.score = _score
                     obj.pose_reliable = True
                     obj.valid = True
                     
@@ -280,14 +279,14 @@ class SFA3D():
                     obj.header.stamp = rospy.Time.now()
                     obj.header.frame_id = scan.header.frame_id
 
-                    obj.score = 0.9
                     obj.pose_reliable = True
+                    obj.valid = True
                     
                     obj.space_frame = scan.header.frame_id
                     obj.label = class_name
                     obj.score = _score
-                    obj.pose.position.x = -x
-                    obj.pose.position.y = -y
+                    obj.pose.position.x = x
+                    obj.pose.position.y = y
                     obj.pose.position.z = z
                     [qx, qy, qz, qw] = euler_to_quaternion(yaw, 0, 0)
                     obj.pose.orientation.x = qx
