@@ -71,6 +71,7 @@ class VisualizeBevWithDetection():
 
         # publish visualization results
         self.visual_result_pub =rospy.Publisher("/visualization/detection", Image, queue_size=1)
+        self.agent_mask_pub =rospy.Publisher("/agents_mask_img", Image, queue_size=1)
     
     def syncCallback(self, velo_msg, detection_bboxes_msg, local_map_msg):
         self.is_callback = True
@@ -117,7 +118,7 @@ class VisualizeBevWithDetection():
             bev_clusters_bboxes.append(corners_bev.transpose())
         return np.array(bev_clusters_bboxes)
 
-    def drawObjects(self, bev_bboxes, image):
+    def drawObjects(self, bev_bboxes, image, is_agent_mask=False):
         for bev_bbox in bev_bboxes:    
             corner_2d = []
             for i in range(len(bev_bbox)):
@@ -127,8 +128,10 @@ class VisualizeBevWithDetection():
             corners_2d_dim = np.expand_dims(corner_2d, axis=1)
             corners_2d_dim = corners_2d_dim.astype(int)
             hull = cv2.convexHull(corners_2d_dim)
-            
-            cv2.drawContours(image, [hull], 0, (0, 255, 0), thickness=1)
+            if is_agent_mask:
+                cv2.drawContours(image, [hull], 0, (255, 255, 255), thickness=-1)
+            else:
+                cv2.drawContours(image, [hull], 0, (0, 255, 0), thickness=1)
         return image
 
 
@@ -228,6 +231,7 @@ class VisualizeBevWithDetection():
         all_bev_map[:cnf.BEV_HEIGHT, :, :] = bev_map_binary
         all_bev_map[cnf.BEV_HEIGHT:, :, :] = back_bevmap_binary
 
+        agents_mask = np.zeros((2*cnf.BEV_HEIGHT, cnf.BEV_WIDTH, 3), dtype=np.uint8)
         if self.white_background:
             all_bev_map = 255 - all_bev_map
         
@@ -235,6 +239,7 @@ class VisualizeBevWithDetection():
         if (detection_msg is not None):
             bev_bboxes = self.get_bev_bboxes(detection_msg)
             all_bev_map = self.drawObjects(bev_bboxes, all_bev_map)
+            agents_mask = self.drawObjects(bev_bboxes, agents_mask, is_agent_mask=True)
         
         # Draw raw lidar bev with raster map
         if (self.with_map):
@@ -245,6 +250,10 @@ class VisualizeBevWithDetection():
         all_bev_map_msg = self.bridge.cv2_to_imgmsg(all_bev_map, "bgr8")
         all_bev_map_msg.header = velo_msg.header
         self.visual_result_pub.publish(all_bev_map_msg)
+
+        agents_mask_msg = self.bridge.cv2_to_imgmsg(agents_mask, "bgr8")
+        agents_mask_msg.header = velo_msg.header
+        self.agent_mask_pub.publish(agents_mask_msg)
 
         self.is_callback = False
 
