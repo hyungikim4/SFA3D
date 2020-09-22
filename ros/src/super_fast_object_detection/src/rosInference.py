@@ -194,13 +194,13 @@ class SFA3D():
             detections, back_detections, bev_map, fps = do_detect_2sides(self.configs, self.model, bev_map, back_bevmap)
         print(fps)
         objects_msg = DetectedObjectArray()
-        objects_msg.header = scan.header
-        # objects_msg.header.stamp = rospy.Time.now()
-        # objects_msg.header.frame_id = scan.header.frame_id
+        # objects_msg.header = scan.header
+        objects_msg.header.stamp = rospy.Time.now()
+        objects_msg.header.frame_id = scan.header.frame_id
         bboxes_msg = BoundingBoxArray()
-        bboxes_msg.header = scan.header
-        # bboxes_msg.header.stamp = rospy.Time.now()
-        # bboxes_msg.header.frame_id = scan.header.frame_id
+        # bboxes_msg.header = scan.header
+        bboxes_msg.header.stamp = rospy.Time.now()
+        bboxes_msg.header.frame_id = scan.header.frame_id
         flag = False
 
         for j in range(self.configs.num_classes):
