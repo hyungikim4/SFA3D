@@ -20,6 +20,7 @@ colors = [[0, 255, 255], [0, 0, 255], [255, 0, 0], [255, 120, 0],
           [255, 120, 120], [0, 120, 0], [120, 255, 255], [120, 0, 255]]
 
 #####################################################################################
+##### Original KITTI Model #####
 # boundary = {
 #     "minX": 0,
 #     "maxX": 50,
@@ -45,11 +46,38 @@ colors = [[0, 255, 255], [0, 0, 255], [255, 0, 0], [255, 120, 0],
 # BEV_WIDTH = 608  # across y axis -25m ~ 25m
 # BEV_HEIGHT = 608  # across x axis 0m ~ 50m
 
+##### For veloster pretrained model #####
+# boundary = {
+#     "minX": 0,
+#     "maxX": 40,
+#     "minY": -20,
+#     "maxY": 20,
+#     "minZ": -2.73,
+#     "maxZ": 1.27
+# }
+
+# bound_size_x = boundary['maxX'] - boundary['minX']
+# bound_size_y = boundary['maxY'] - boundary['minY']
+# bound_size_z = boundary['maxZ'] - boundary['minZ']
+
+# boundary_back = {
+#     "minX": -40,
+#     "maxX": 0,
+#     "minY": -20,
+#     "maxY": 20,
+#     "minZ": -2.73,
+#     "maxZ": 1.27
+# }
+
+# BEV_WIDTH = 416  # across y axis -25m ~ 25m
+# BEV_HEIGHT = 416  # across x axis 0m ~ 50m
+
+##### For veloster 2 sides pretrained model #####
 boundary = {
     "minX": 0,
-    "maxX": 40,
-    "minY": -20,
-    "maxY": 20,
+    "maxX": 60,
+    "minY": -30,
+    "maxY": 30,
     "minZ": -2.73,
     "maxZ": 1.27
 }
@@ -59,16 +87,17 @@ bound_size_y = boundary['maxY'] - boundary['minY']
 bound_size_z = boundary['maxZ'] - boundary['minZ']
 
 boundary_back = {
-    "minX": -40,
+    "minX": -60,
     "maxX": 0,
-    "minY": -20,
-    "maxY": 20,
+    "minY": -30,
+    "maxY": 30,
     "minZ": -2.73,
     "maxZ": 1.27
 }
 
-BEV_WIDTH = 416  # across y axis -25m ~ 25m
-BEV_HEIGHT = 416  # across x axis 0m ~ 50m
+BEV_WIDTH = 608  # across y axis -25m ~ 25m
+BEV_HEIGHT = 608  # across x axis 0m ~ 50m
+
 DISCRETIZATION = (boundary["maxX"] - boundary["minX"]) / BEV_HEIGHT
 
 # maximum number of points per voxel

@@ -22,6 +22,8 @@ import torch
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 import torch.nn.functional as F
+import numpy as np
+import cv2
 
 BN_MOMENTUM = 0.1
 
@@ -168,27 +170,25 @@ class PoseResNet(nn.Module):
         x = self.relu(x)
         x = self.maxpool(x)
 
-        out_layer1 = self.layer1(x)
-        out_layer2 = self.layer2(out_layer1)
-
-        out_layer3 = self.layer3(out_layer2)
-
-        out_layer4 = self.layer4(out_layer3)
+        out_layer1 = self.layer1(x) # [1, 64, 152, 152]
+        out_layer2 = self.layer2(out_layer1) # [1, 128, 76, 76] 
+        out_layer3 = self.layer3(out_layer2) # [1, 256, 38, 38]
+        out_layer4 = self.layer4(out_layer3) # [1, 512, 19, 19]
 
         # up_level1: torch.Size([b, 512, 14, 14])
-        up_level1 = F.interpolate(out_layer4, scale_factor=2, mode='bilinear', align_corners=True)
+        up_level1 = F.interpolate(out_layer4, scale_factor=2, mode='bilinear', align_corners=True) # [1, 512, 38, 38]
 
         concat_level1 = torch.cat((up_level1, out_layer3), dim=1)
         # up_level2: torch.Size([b, 256, 28, 28])
         up_level2 = F.interpolate(self.conv_up_level1(concat_level1), scale_factor=2, mode='bilinear',
-                                  align_corners=True)
+                                  align_corners=True) # [1, 256, 76, 76]
 
         concat_level2 = torch.cat((up_level2, out_layer2), dim=1)
         # up_level3: torch.Size([b, 128, 56, 56]),
         up_level3 = F.interpolate(self.conv_up_level2(concat_level2), scale_factor=2, mode='bilinear',
-                                  align_corners=True)
+                                  align_corners=True) # [1, 128, 152, 152]
         # up_level4: torch.Size([b, 64, 56, 56])
-        up_level4 = self.conv_up_level3(torch.cat((up_level3, out_layer1), dim=1))
+        up_level4 = self.conv_up_level3(torch.cat((up_level3, out_layer1), dim=1)) # [1, 64, 152, 152]
 
         ret = {}
         for head in self.heads:
@@ -199,10 +199,10 @@ class PoseResNet(nn.Module):
                 # Make sure the added features having same size of heatmap output
                 if (fpn_out_w != hm_w) or (fpn_out_h != hm_h):
                     fpn_out = F.interpolate(fpn_out, size=(hm_h, hm_w))
+                
                 temp_outs.append(fpn_out)
             # Take the softmax in the keypoint feature pyramid network
             final_out = self.apply_kfpn(temp_outs)
-
             ret[head] = final_out
 
         return ret

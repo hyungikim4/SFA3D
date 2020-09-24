@@ -109,9 +109,20 @@ def do_detect(configs, model, bevmap, is_front):
     input_bev_maps = bevmap.unsqueeze(0).to(configs.device, non_blocking=True).float()
     t1 = time_synchronized()
     outputs = model(input_bev_maps)
-
     outputs['hm_cen'] = _sigmoid(outputs['hm_cen'])
     outputs['cen_offset'] = _sigmoid(outputs['cen_offset'])
+    # torch.Size([1, 3, 152, 152]) torch.Size([1, 2, 152, 152]) torch.Size([1, 2, 152, 152]) torch.Size([1, 1, 152, 152]) torch.Size([1, 3, 152, 152])
+    
+    # input_img = np.squeeze(input_bev_maps.detach().cpu().numpy()) 
+    # input_img = np.transpose(input_img, (1,2,0))*255
+    # # input_img = cv2.resize(input_img, (152,152))
+    # output_img = np.squeeze(outputs['hm_cen'].detach().cpu().numpy())
+    # output_img = np.transpose(output_img, (1,2,0))*255
+    # cv2.imwrite('./output.png', output_img)
+    # cv2.imwrite('./input.png', input_img)
+    
+    # print(outputs['hm_cen'].shape, outputs['cen_offset'].shape, outputs['direction'].shape, outputs['z_coor'].shape, outputs['dim'].shape)
+    
     # print(torch.max(outputs['cen_offset']))
     # # Test 0 offset
     # outputs['cen_offset'] = torch.zeros_like(outputs['cen_offset'])
