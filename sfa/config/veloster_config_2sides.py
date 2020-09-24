@@ -47,7 +47,7 @@ colors = [[0, 255, 255], [0, 0, 255], [255, 0, 0], [255, 120, 0],
 # DISCRETIZATION = (boundary["maxX"] - boundary["minX"]) / BEV_HEIGHT
 
 boundary = {
-    "minX": 0.,
+    "minX": -30.,
     "maxX": 30.,
     "minY": -30.,
     "maxY": 30.,
@@ -69,7 +69,7 @@ boundary_back = {
 }
 
 BEV_WIDTH = 608  # across y axis -25m ~ 25m
-BEV_HEIGHT = 304  # across x axis 0m ~ 50m
+BEV_HEIGHT = 608  # across x axis 0m ~ 50m
 DISCRETIZATION = (boundary["maxX"] - boundary["minX"]) / float(BEV_HEIGHT)
 
 # maximum number of points per voxel

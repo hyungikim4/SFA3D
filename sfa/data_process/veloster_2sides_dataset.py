@@ -23,7 +23,7 @@ import torch
 sys.path.append('../')
 
 from sfa.data_process.kitti_data_utils import gen_hm_radius, compute_radius, Calibration, get_filtered_lidar
-from sfa.data_process.kitti_bev_utils import makeBEVMap, drawRotatedBox, get_corners
+from sfa.data_process.veloster_2sides_bev_utils import makeBEVMap, drawRotatedBox, get_corners
 from sfa.data_process import transformation
 
 from xml.etree.ElementTree import parse
@@ -159,7 +159,7 @@ class VelosterDataset(Dataset):
         # Convert from image coodi to lidar coodi
         for img_label in img_labels:
             [cls_id, cx, cy, w, h, angle] = img_label
-            x = (cnf.BEV_HEIGHT-cy)*cnf.DISCRETIZATION
+            x = (cnf.BEV_HEIGHT-cy)*cnf.DISCRETIZATION + cnf.boundary["minX"]
             y = -(cx - float(cnf.BEV_HEIGHT)/2.)*cnf.DISCRETIZATION
             if cls_id == 0 or cls_id == 2: # Pedestrian, Cyclist
                 height = 1.73
@@ -480,7 +480,7 @@ if __name__ == '__main__':
     configs.num_classes = 3
     configs.output_width = 608
 
-    configs.dataset_dir = os.path.join('../../', 'dataset', 'veloster_2sides/2020-08-27-17-34-29_east')
+    configs.dataset_dir = os.path.join('../../', 'dataset', 'veloster_2sides')
     # lidar_aug = OneOf([
     #     Random_Rotation(limit_angle=np.pi / 4, p=1.),
     #     Random_Scaling(scaling_range=(0.95, 1.05), p=1.),
@@ -500,6 +500,7 @@ if __name__ == '__main__':
         img_rgb = img_rgb[:,img_w_uint*2:img_w_uint*5,:]
         bev_map = (bev_map.transpose(1, 2, 0) * 255).astype(np.uint8)
         bev_map = cv2.resize(bev_map, (cnf.BEV_HEIGHT, cnf.BEV_WIDTH))
+        cv2.imshow('test',bev_map)
 
         lidar_path = img_path.replace(".png", ".npy").replace("front_image", "lidar")
         lidar_cloud = np.load(lidar_path)

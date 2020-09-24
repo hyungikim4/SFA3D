@@ -19,7 +19,7 @@ def parse_train_configs():
     parser = argparse.ArgumentParser(description='The Implementation using PyTorch')
     parser.add_argument('--seed', type=int, default=2020,
                         help='re-produce the results with seed random')
-    parser.add_argument('--saved_fn', type=str, default='kitti_608_608_60m', metavar='FN',
+    parser.add_argument('--saved_fn', type=str, default='veloster_608_608', metavar='FN',
                         help='The name using for saving logs, models,...')
 
     parser.add_argument('--root-dir', type=str, default='../', metavar='PATH',
@@ -158,7 +158,7 @@ def parse_train_configs():
     ####################################################################
     ############## Dataset, logs, Checkpoints dir ######################
     ####################################################################
-    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', 'kitti')
+    configs.dataset_dir = os.path.join(configs.root_dir, 'dataset', 'veloster_2sides')
     configs.checkpoints_dir = os.path.join(configs.root_dir, 'checkpoints', configs.saved_fn)
     configs.logs_dir = os.path.join(configs.root_dir, 'logs', configs.saved_fn)
 

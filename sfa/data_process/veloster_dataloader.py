@@ -16,7 +16,7 @@ import numpy as np
 
 sys.path.append('../')
 
-from sfa.data_process.veloster_dataset import VelosterDataset
+from sfa.data_process.veloster_2sides_dataset import VelosterDataset
 from sfa.data_process.transformation import OneOf, Random_Rotation, Random_Scaling
 
 

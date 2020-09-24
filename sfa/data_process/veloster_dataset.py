@@ -23,7 +23,7 @@ import torch
 sys.path.append('../')
 
 from sfa.data_process.kitti_data_utils import gen_hm_radius, compute_radius, Calibration, get_filtered_lidar
-from sfa.data_process.kitti_bev_utils import makeBEVMap, drawRotatedBox, get_corners
+from sfa.data_process.veloster_bev_utils import makeBEVMap, drawRotatedBox, get_corners
 from sfa.data_process import transformation
 
 from xml.etree.ElementTree import parse
