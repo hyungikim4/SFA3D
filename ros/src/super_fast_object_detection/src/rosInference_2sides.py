@@ -25,7 +25,7 @@ import cv2
 import torch
 
 sys.path.append('./')
-sys.path.append('/home/khg/Python_proj/SFA3D')
+sys.path.append('/home/usrg/python_ws/SFA3D')
 from sfa.models.model_utils import create_model
 from sfa.utils.evaluation_utils import draw_predictions, convert_det_to_real_values
 from sfa.data_process.transformation import lidar_to_camera_box
@@ -104,7 +104,7 @@ class SFA3D():
         # package_path = rospack.get_path('super_fast_object_detection')
         configs = parse_demo_configs()
         # configs.pretrained_path = package_path + '/checkpoints/kitti_fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
-        configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_608_608/Model_veloster_608_608_epoch_1000.pth'
+        configs.pretrained_path = '/home/usrg/python_ws/SFA3D/Model_veloster_608_608_epoch_1000.pth'
         model = create_model(configs)
         print('\n\n' + '-*=' * 30 + '\n\n')
         assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)

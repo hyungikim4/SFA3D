@@ -19,7 +19,7 @@ def makeBEVMap_binary(PointCloud_, boundary):
 
     # Discretize Feature Map
     PointCloud = np.copy(PointCloud_)
-    PointCloud[:, 0] = np.int_(np.floor(PointCloud[:, 0] / cnf.DISCRETIZATION))
+    PointCloud[:, 0] = np.int_(np.floor(PointCloud[:, 0] / cnf.DISCRETIZATION) + Height / 2)
     PointCloud[:, 1] = np.int_(np.floor(PointCloud[:, 1] / cnf.DISCRETIZATION) + Width / 2)
 
     # sort-3times
