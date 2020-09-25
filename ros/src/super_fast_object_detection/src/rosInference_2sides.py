@@ -104,7 +104,7 @@ class SFA3D():
         # package_path = rospack.get_path('super_fast_object_detection')
         configs = parse_demo_configs()
         # configs.pretrained_path = package_path + '/checkpoints/kitti_fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
-        configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/kitti_608_608_60m/Model_kitti_608_608_60m_epoch_950.pth'
+        configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_608_608/Model_veloster_608_608_epoch_1000.pth'
         model = create_model(configs)
         print('\n\n' + '-*=' * 30 + '\n\n')
         assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
@@ -119,7 +119,7 @@ class SFA3D():
         self.bboxes_pub = rospy.Publisher('/detection/bboxes', BoundingBoxArray, queue_size=1)
         self.detection_pub = rospy.Publisher('detected_objects', DetectedObjectArray, queue_size=1)
         
-        self.velo_sub = rospy.Subscriber("/kitti/velo/pointcloud", PointCloud2, self.velo_callback, queue_size=1, buff_size=2**24) # "/kitti/velo/pointcloud"
+        self.velo_sub = rospy.Subscriber("/transformed_pointcloud", PointCloud2, self.velo_callback, queue_size=1, buff_size=2**24) # "/kitti/velo/pointcloud"
         print("Started Node")
 
 
