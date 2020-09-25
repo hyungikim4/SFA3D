@@ -7,11 +7,11 @@ ext = ".txt"
 
 # path = sys.argv[1]
 
-path = "/home/khg/Python_proj/SFA3D/dataset/veloster/training/"
-save_path = "/home/khg/Python_proj/SFA3D/dataset/veloster/ImageSets/"
+path = "/home/khg/Python_proj/SFA3D/dataset/veloster_2sides/training/"
+save_path = "/home/khg/Python_proj/SFA3D/dataset/veloster_2sides/ImageSets/"
 if not os.path.exists(save_path):
 	os.makedirs(save_path)
-label_path = os.path.join(path,"front_label")
+label_path = os.path.join(path,"label")
 
 f = open(os.path.join(save_path, "train.txt"), 'w')
 

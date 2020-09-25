@@ -500,7 +500,6 @@ if __name__ == '__main__':
         img_rgb = img_rgb[:,img_w_uint*2:img_w_uint*5,:]
         bev_map = (bev_map.transpose(1, 2, 0) * 255).astype(np.uint8)
         bev_map = cv2.resize(bev_map, (cnf.BEV_HEIGHT, cnf.BEV_WIDTH))
-        cv2.imshow('test',bev_map)
 
         lidar_path = img_path.replace(".png", ".npy").replace("front_image", "lidar")
         lidar_cloud = np.load(lidar_path)

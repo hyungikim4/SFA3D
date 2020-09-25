@@ -29,10 +29,10 @@ def parse_train_configs():
     ####################################################################
     parser.add_argument('--arch', type=str, default='fpn_resnet_18', metavar='ARCH',
                         help='The name of the model architecture')
-    parser.add_argument('--pretrained_path', type=str, default=None, metavar='PATH',
-                        help='the path of the pretrained checkpoint')
-    # parser.add_argument('--pretrained_path', type=str, default="/home/khg/Python_proj/SFA3D/checkpoints/kitti_416_416/Model_kitti_416_416_epoch_300.pth", metavar='PATH',
+    # parser.add_argument('--pretrained_path', type=str, default=None, metavar='PATH',
     #                     help='the path of the pretrained checkpoint')
+    parser.add_argument('--pretrained_path', type=str, default="/home/khg/Python_proj/SFA3D/checkpoints/kitti_608_608_60m/Model_kitti_608_608_60m_epoch_950.pth", metavar='PATH',
+                        help='the path of the pretrained checkpoint')
 
     ####################################################################
     ##############     Dataloader and Running configs            #######
