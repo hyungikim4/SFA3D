@@ -8,6 +8,7 @@ import sensor_msgs.point_cloud2 as pc2
 import ros_numpy
 import copy
 import tf
+import time
 
 import message_filters
 from sensor_msgs.msg import Image, CompressedImage
@@ -22,8 +23,8 @@ if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 # sys.path.append('/home/khg/Python_proj/SFA3D')
-from veloster_bev_utils import makeBEVMap, makeBEVMap_binary
-import veloster_config as cnf
+from veloster_2sides_bev_utils import makeBEVMap, makeBEVMap_binary
+import veloster_config_2sides as cnf
 from veloster_data_utils import get_filtered_lidar
 
 
@@ -48,7 +49,7 @@ def get_xyzi_points(cloud_array, remove_nans=True, dtype=np.float):
 
 class MakeBevImages():
     def __init__(self):
-        self.save_RGB_binray_all = True
+        self.save_RGB_binary_all = True
         self.save_RGB_bev_input = False
         self.do_overwrite = True
         self.with_map = True
@@ -62,40 +63,26 @@ class MakeBevImages():
         self.fl_img_msg = None
         self.fr_img_msg = None
 
-        # Image
-        self.front_img_sub = rospy.Subscriber("/gmsl_camera1/compressed", CompressedImage, self.front_img_callback, queue_size=1)
+        # Image for time sync
+        self.front_img_sub = rospy.Subscriber("/gmsl_camera1/DwODresult_img/compressed", CompressedImage, self.front_img_callback, queue_size=1)
         self.now_front_img_pub = rospy.Publisher("/now/gmsl_camera1/compressed", CompressedImage, queue_size=1)
-        self.fl_img_sub = rospy.Subscriber("/gmsl_camera2/compressed", CompressedImage, self.fl_img_callback, queue_size=1)
+        self.fl_img_sub = rospy.Subscriber("/gmsl_camera2/DwODresult_img/compressed", CompressedImage, self.fl_img_callback, queue_size=1)
         self.now_fl_img_pub = rospy.Publisher("/now/gmsl_camera2/compressed", CompressedImage, queue_size=1)
-        self.fr_img_sub = rospy.Subscriber("/gmsl_camera3/compressed", CompressedImage, self.fr_img_callback, queue_size=1)
+        self.fr_img_sub = rospy.Subscriber("/gmsl_camera3/DwODresult_img/compressed", CompressedImage, self.fr_img_callback, queue_size=1)
         self.now_fr_img_pub = rospy.Publisher("/now/gmsl_camera3/compressed", CompressedImage, queue_size=1)
-        
-        # Local vector map
-        self.local_vector_map_sub =rospy.Subscriber("/lanes/local_vector_map", PoseArray, self.local_map_callback, queue_size=1)
-        self.now_local_vector_map_pub = rospy.Publisher("/now/lanes/local_vector_map", PoseArray, queue_size=1)
-
-        # Ego pose
-        self.global_ego_pose_sub = rospy.Subscriber("/ego_pose", PoseStamped, self.ego_pose_callback, queue_size=1)
-        self.now_global_ego_pose_pub = rospy.Publisher("/now/ego_pose", PoseStamped, queue_size=1)
-
-        # Lidar
-        self.velo_sub = rospy.Subscriber("/transformed_pointcloud", PointCloud2, self.velo_callback, queue_size=1)
-        self.now_velo_pub = rospy.Publisher("/now/transformed_pointcloud", PointCloud2, queue_size=1)
-        self.filtered_velo_sub = rospy.Subscriber("/points_no_ground", PointCloud2, self.filtered_lidar_callback, queue_size=1)
-        self.now_filtered_velo_pub = rospy.Publisher("/now/points_no_ground", PointCloud2, queue_size=1)
 
         # Message filter
-        self.now_global_ego_pose_sub = message_filters.Subscriber("/now/ego_pose", PoseStamped)
-        self.now_local_vector_map_sub = message_filters.Subscriber("/now/lanes/local_vector_map", PoseArray)
-        self.now_velo_sub = message_filters.Subscriber("/now/transformed_pointcloud", PointCloud2)
-        self.now_filtered_velo_sub = message_filters.Subscriber("/now/points_no_ground", PointCloud2)
+        self.now_global_ego_pose_sub = message_filters.Subscriber("/ego_pose", PoseStamped)
+        self.now_local_vector_map_sub = message_filters.Subscriber("/lanes/local_vector_map", PoseArray)
+        self.now_velo_sub = message_filters.Subscriber("/transformed_pointcloud", PointCloud2)
+        self.now_filtered_velo_sub = message_filters.Subscriber("/points_no_ground", PointCloud2)
         self.now_front_img_sub = message_filters.Subscriber("/now/gmsl_camera1/compressed", CompressedImage)
         self.now_fl_img_sub = message_filters.Subscriber("/now/gmsl_camera2/compressed", CompressedImage)
         self.now_fr_img_sub = message_filters.Subscriber("/now/gmsl_camera3/compressed", CompressedImage)
         ts = message_filters.ApproximateTimeSynchronizer([self.now_global_ego_pose_sub, self.now_local_vector_map_sub, self.now_velo_sub, self.now_filtered_velo_sub, self.now_front_img_sub, self.now_fl_img_sub, self.now_fr_img_sub], 10, 0.1, allow_headerless=True)
         ts.registerCallback(self.syncCallback)
 
-        self.save_dir_path = '/home/usrg/python_ws/SFA3D/dataset/veloster/training/2020-08-27-17-34-29_east'
+        self.save_dir_path = '/home/usrg/python_ws/SFA3D/dataset/veloster_2sides/training/2020-09-10-17-47-33_good'
         self.save_lidar_path = os.path.join(self.save_dir_path, 'lidar')
         self.save_ego_pose_path = os.path.join(self.save_dir_path, 'ego_pose')
         self.save_front_img_path = os.path.join(self.save_dir_path, 'front_image')
@@ -136,12 +123,12 @@ class MakeBevImages():
     
     def get_pixel_xy(self, real_x, real_y):
         x = int(-real_y/cnf.DISCRETIZATION)+cnf.BEV_WIDTH/2
-        y = int(-real_x/cnf.DISCRETIZATION)+cnf.BEV_HEIGHT
+        y = int(-real_x/cnf.DISCRETIZATION)+cnf.BEV_HEIGHT/2
         return [x,y]
 
     def drawRasterizedMap(self, map_msg):
         #### Make rasterized map ####
-        rasterized_map = np.zeros((2*cnf.BEV_HEIGHT, cnf.BEV_WIDTH, 3), dtype=np.uint8)
+        rasterized_map = np.zeros((cnf.BEV_HEIGHT, cnf.BEV_WIDTH, 3), dtype=np.uint8)
 
         # Get each lane
         num_of_pose = int(len(map_msg.poses)/2)
@@ -201,9 +188,9 @@ class MakeBevImages():
         return rasterized_map
 
     def save_dataset(self, ego_pose_msg, local_map_msg, velo_msg, filtered_velo_msg, front_img_msg, fl_img_msg, fr_img_msg):
-        if (self.velo_msg is None or not self.is_callback):
+        if (velo_msg is None or ego_pose_msg is None or not self.is_callback):
             return
-        
+        start_time = time.time()    
         f = open(os.path.join(self.save_ego_pose_path, '%06d.txt'%self.start_index), 'w')
         quaternion = (
                 ego_pose_msg.pose.orientation.x,
@@ -212,10 +199,13 @@ class MakeBevImages():
                 ego_pose_msg.pose.orientation.w)
         euler = tf.transformations.euler_from_quaternion(quaternion)
         yaw = euler[2]
-        data = "%f %f %f %f\n"%(ego_pose_msg.pose.position.x, ego_pose_msg.pose.position.y, ego_pose_msg.pose.position.z, yaw)
+        data = "%f %f %f %f %f %f\n"%(velo_msg.header.stamp.to_sec(), velo_msg.header.stamp.to_nsec(), ego_pose_msg.pose.position.x, ego_pose_msg.pose.position.y, ego_pose_msg.pose.position.z, yaw)
         f.write(data)
         f.close()
+
         rasterized_map = self.drawRasterizedMap(local_map_msg)
+        raster_time = time.time()
+        # print("raster time %.4f"%(raster_time-start_time))
         try:
             np_arr = np.fromstring(front_img_msg.data, np.uint8)
             front_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -247,7 +237,8 @@ class MakeBevImages():
         # front_image_all = cv2.resize(front_image_all, (int(3*w/2), int(h/2)))
         
         cv2.imwrite(os.path.join(self.save_front_img_path, '%06d.png'%self.start_index), front_image_all)
-        
+        img_time = time.time()
+        # print("img time %.4f"%(img_time-raster_time))     
         # save lidar raw data
         msg_numpy = ros_numpy.numpify(velo_msg)
         if (len(msg_numpy) == 0):
@@ -274,91 +265,50 @@ class MakeBevImages():
             i = np.zeros((xyz_array.shape[0], 1))
             filtered_gen_numpy = np.concatenate((xyz_array,i), axis=1)
         # save bev images
-        front_lidar = get_filtered_lidar(gen_numpy, cnf.boundary)
-        back_lidar = get_filtered_lidar(gen_numpy, cnf.boundary_back)
-        filtered_front_lidar = get_filtered_lidar(filtered_gen_numpy, cnf.boundary)
-        filtered_back_lidar = get_filtered_lidar(filtered_gen_numpy, cnf.boundary_back)
-        front_map = rasterized_map[:cnf.BEV_HEIGHT, :, :]
-        back_map = rasterized_map[cnf.BEV_HEIGHT:, :, :]
+        lidar = get_filtered_lidar(gen_numpy, cnf.boundary)
+        filtered_lidar = get_filtered_lidar(filtered_gen_numpy, cnf.boundary)
 
-        if self.save_RGB_binray_all:
-            bev_map = makeBEVMap(front_lidar, cnf.boundary)
-            bev_map_binary = makeBEVMap_binary(filtered_front_lidar, cnf.boundary)
-            back_bevmap = makeBEVMap(back_lidar, cnf.boundary_back)
-            back_bevmap_binary = makeBEVMap_binary(filtered_back_lidar, cnf.boundary_back)
+        if self.save_RGB_binary_all:
+            bev_map = makeBEVMap(lidar, cnf.boundary)
+            bev_map_binary = makeBEVMap_binary(filtered_lidar, cnf.boundary)
 
             bev_map = np.transpose(bev_map, (1,2,0))
-            back_bevmap = np.transpose(back_bevmap, (1,2,0))
             bev_map_binary = np.transpose(bev_map_binary, (1,2,0))
-            back_bevmap_binary = np.transpose(back_bevmap_binary, (1,2,0))
         
             all_bev_map = np.zeros((cnf.BEV_HEIGHT, 2*cnf.BEV_WIDTH, 3))
-            all_back_bev_map = np.zeros((cnf.BEV_HEIGHT, 2*cnf.BEV_WIDTH, 3))
 
             all_bev_map[:,:cnf.BEV_WIDTH,:] = bev_map
             all_bev_map[:,cnf.BEV_WIDTH:,:] = bev_map_binary
-
-            all_back_bev_map[:,:cnf.BEV_WIDTH,:] = back_bevmap
-            all_back_bev_map[:,cnf.BEV_WIDTH:,:] = back_bevmap_binary
             
             all_bev_map = (all_bev_map*255).astype(np.uint8)
-            all_back_bev_map = (all_back_bev_map*255).astype(np.uint8)
-
             all_bev_map = cv2.rotate(all_bev_map, cv2.ROTATE_180)
-            all_back_bev_map = cv2.rotate(all_back_bev_map, cv2.ROTATE_180)
 
             bev_map = all_bev_map
-            back_bevmap = all_back_bev_map
             if (self.with_map):
-                bev_map[:,:cnf.BEV_WIDTH,:] = cv2.addWeighted(bev_map[:,:cnf.BEV_WIDTH,:],0.8,front_map,0.2,0)
-                back_bevmap[:,:cnf.BEV_WIDTH,:] = cv2.addWeighted(back_bevmap[:,:cnf.BEV_WIDTH,:],0.8,back_map,0.2,0)
-            # output_bev_map = np.zeros((2*cnf.BEV_HEIGHT, 2*cnf.BEV_WIDTH, 3))
-            # output_bev_map[:cnf.BEV_HEIGHT,:,:] = all_bev_map
-            # output_bev_map[cnf.BEV_HEIGHT:,:,:] = cv2.resize(front_img, (2*cnf.BEV_WIDTH, cnf.BEV_HEIGHT))
-            
-            # bev_map = output_bev_map
-            # back_bevmap = all_back_bev_map 
+                bev_map[:,:cnf.BEV_WIDTH,:] = cv2.addWeighted(bev_map[:,:cnf.BEV_WIDTH,:],0.8,rasterized_map,0.2,0)
+ 
         else:
             if self.save_RGB_bev_input:
-                bev_map = makeBEVMap(front_lidar, cnf.boundary)
-                back_bevmap = makeBEVMap(back_lidar, cnf.boundary_back)
+                bev_map = makeBEVMap(lidar, cnf.boundary)
             else:
-                bev_map = makeBEVMap_binary(front_lidar, cnf.boundary)
-                back_bevmap = makeBEVMap_binary(back_lidar, cnf.boundary_back)
+                bev_map = makeBEVMap_binary(lidar, cnf.boundary)
         
             bev_map = np.transpose(bev_map, (1,2,0))
-            back_bevmap = np.transpose(back_bevmap, (1,2,0))
             bev_map = (bev_map*255).astype(np.uint8)
-            back_bevmap = (back_bevmap*255).astype(np.uint8)
             bev_map = cv2.rotate(bev_map, cv2.ROTATE_180)
-            back_bevmap = cv2.rotate(back_bevmap, cv2.ROTATE_180)
 
-        # cv2.imshow('bev', bev_map)
-        # cv2.imshow('back', back_bevmap)
-        # cv2.waitKey(1)
-        h, w, c = bev_map.shape
-        bev_2side_map = np.zeros((2*h, w, c), dtype=np.uint8)
-        bev_2side_map[:h,:,:] = bev_map
-        bev_2side_map[h:,:,:] = back_bevmap
+        bev_time = time.time()
+        # print("bev time %.4f"%(bev_time-img_time))
 
-        h, w, c = front_map.shape
-        map_2side = np.zeros((2*h, w, c), dtype=np.uint8)
-        map_2side[:h,:,:] = front_map
-        map_2side[h:,:,:] = back_map
-
-        cv2.imwrite(os.path.join(self.save_bev_path, '%06d.png'%self.start_index), bev_2side_map)
-        cv2.imwrite(os.path.join(self.save_map_path, '%06d.png'%self.start_index), map_2side)
+        cv2.imwrite(os.path.join(self.save_bev_path, '%06d.png'%self.start_index), bev_map)
+        cv2.imwrite(os.path.join(self.save_map_path, '%06d.png'%self.start_index), rasterized_map)
 
         print('%06d.png'%self.start_index)
         self.start_index += 1
         self.is_callback = False
+        end_time = time.time()
+        # print("%f sec"%(end_time-start_time))
 
-    def local_map_callback(self, msg):
-        msg.header.stamp = rospy.Time.now()
-        self.now_local_vector_map_pub.publish(msg)
-    def ego_pose_callback(self, msg):
-        msg.header.stamp = rospy.Time.now()
-        self.now_global_ego_pose_pub.publish(msg)
     def front_img_callback(self, msg):
         msg.header.stamp = rospy.Time.now()
         self.now_front_img_pub.publish(msg)
@@ -368,12 +318,7 @@ class MakeBevImages():
     def fr_img_callback(self, msg):
         msg.header.stamp = rospy.Time.now()
         self.now_fr_img_pub.publish(msg)
-    def velo_callback(self, msg):
-        msg.header.stamp = rospy.Time.now()
-        self.now_velo_pub.publish(msg)
-    def filtered_lidar_callback(self, msg):
-        msg.header.stamp = rospy.Time.now()
-        self.now_filtered_velo_pub.publish(msg)
+
 if __name__=='__main__':
     rospy.init_node('make_bin_and_bev_images', anonymous=True)
     make_bev = MakeBevImages()
