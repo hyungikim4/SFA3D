@@ -81,7 +81,7 @@ class MakeBevImages():
 
         self.publisher = rospy.Publisher('/test', PoseStamped, queue_size=1)
 
-        self.save_dir_path = '/home/usrg/python_ws/SFA3D/dataset/veloster_2sides/prediction_dataset/2020-09-24-17-40-26'
+        self.save_dir_path = '/home/usrg/python_ws/SFA3D/dataset/veloster_2sides/prediction_dataset/2020-09-22-16-08-48'
         self.save_lidar_path = os.path.join(self.save_dir_path, 'lidar')
         self.save_ego_pose_path = os.path.join(self.save_dir_path, 'ego_pose')
         self.save_front_img_path = os.path.join(self.save_dir_path, 'front_image')
