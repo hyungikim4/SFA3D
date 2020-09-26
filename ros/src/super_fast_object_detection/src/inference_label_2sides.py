@@ -105,6 +105,9 @@ class SFA3D_inference():
         self.configs = configs
         self.model.eval()
 
+        self.save_bev_image = True
+        self.bev_dir = os.path.join(data_root, 'bev')
+
         self.results_dir = os.path.join(data_root, 'inference_results')
 
         if not os.path.exists(self.results_dir):
@@ -127,8 +130,12 @@ class SFA3D_inference():
         gen_numpy = np.load(npy_file)
         lidar = get_filtered_lidar(gen_numpy, cnf.boundary)
         bev_map = makeBEVMap(lidar, cnf.boundary)
+        if self.save_bev_image:
+            bev_map_image = (np.transpose(bev_map, (1,2,0))*255).astype(np.uint8)
+            save_bev_image_filename = os.path.basename(npy_file).replace(".npy", ".png")
+            cv2.imwrite(os.path.join(self.bev_dir, save_bev_image_filename), bev_map_image)
         bev_map = torch.from_numpy(bev_map)
-
+    
         with torch.no_grad():
             detections, bev_map, fps = do_detect(self.configs, self.model, bev_map, is_front=True)
         
@@ -181,4 +188,4 @@ class SFA3D_inference():
         return bboxes_msg
         
 if __name__ == '__main__':
-    sfa3d = SFA3D_inference(data_root='/home/usrg/python_ws/SFA3D/dataset/veloster_2sides/training/2020-09-10-17-47-33_good')
+    sfa3d = SFA3D_inference(data_root='/home/usrg/python_ws/SFA3D/dataset/veloster_2sides/prediction_dataset/2020-09-24-17-40-26')
