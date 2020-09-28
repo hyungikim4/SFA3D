@@ -19,7 +19,7 @@ import cv2
 import torch
 
 sys.path.append('./')
-sys.path.append('/home/usrg/python_ws/SFA3D')
+sys.path.append('/home/khg/Python_proj/SFA3D')
 from sfa.models.model_utils import create_model
 from sfa.utils.evaluation_utils import draw_predictions, convert_det_to_real_values
 from sfa.data_process.transformation import lidar_to_camera_box
@@ -90,10 +90,10 @@ def quaternion_to_euler(quat):
     return roll, pitch, yaw
 
 class SFA3D_inference():
-    def __init__(self, data_root):
+    def __init__(self, data_root, have_train_txt=False):
         self.conf_thres = 0.5
         configs = parse_demo_configs()
-        configs.pretrained_path = '/home/usrg/python_ws/SFA3D/Model_veloster_608_608_epoch_1000.pth'
+        configs.pretrained_path = '/home/khg/Python_proj/SFA3D/checkpoints/veloster_608_608_2/Model_veloster_608_608_2_epoch_1000.pth'
         model = create_model(configs)
         print('\n\n' + '-*=' * 30 + '\n\n')
         assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
@@ -105,11 +105,11 @@ class SFA3D_inference():
         self.configs = configs
         self.model.eval()
 
-        self.save_bev_image = True
+        self.save_bev_image = False
         self.bev_dir = os.path.join(data_root, 'bev')
         if self.save_bev_image and not os.path.exists(self.bev_dir):
             os.makedirs(self.bev_dir)
-        self.results_dir = os.path.join(data_root, 'inference_results')
+        self.results_dir = os.path.join(data_root, 'sample_labels')
 
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir)
@@ -119,11 +119,22 @@ class SFA3D_inference():
             f.write("Car\n")
             f.write("Cyclist\n")
 
-        lidar_file_list = sorted(glob.glob(os.path.join(data_root, 'lidar/*.npy')))
+        if have_train_txt:
+            train_path = os.path.join(data_root, 'ImageSets/train.txt')
+            with open(train_path, 'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    line = line.strip('\n')
+                    lidar_file_path = os.path.join(data_root, 'lidar/'+line+".npy")
+                    bboxes_msg = self.inference_one(lidar_file_path)
+                    print(lidar_file_path)
         
-        for lidar_file in lidar_file_list:
-            bboxes_msg = self.inference_one(lidar_file)
-            print(lidar_file)
+        else:
+            lidar_file_list = sorted(glob.glob(os.path.join(data_root, 'lidar/*.npy')))
+            
+            for lidar_file in lidar_file_list:
+                bboxes_msg = self.inference_one(lidar_file)
+                print(lidar_file)
 
 
     def inference_one(self, npy_file):
@@ -190,4 +201,4 @@ class SFA3D_inference():
         return bboxes_msg
         
 if __name__ == '__main__':
-    sfa3d = SFA3D_inference(data_root='/home/usrg/python_ws/SFA3D/dataset/veloster_2sides/prediction_dataset/2020-09-22-16-08-48')
+    sfa3d = SFA3D_inference(data_root='/media/khg/Samsung_T5/lidar_object_detection/prediction_dataset/prediction_dataset/2020-09-24-17-40-26', have_train_txt=True)
