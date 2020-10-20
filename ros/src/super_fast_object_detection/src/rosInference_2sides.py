@@ -104,7 +104,7 @@ class SFA3D():
         # package_path = rospack.get_path('super_fast_object_detection')
         configs = parse_demo_configs()
         # configs.pretrained_path = package_path + '/checkpoints/kitti_fpn_resnet_18/fpn_resnet_18_epoch_300.pth'
-        configs.pretrained_path = '/home/usrg/python_ws/SFA3D/Model_veloster_608_608_epoch_1000.pth'
+        configs.pretrained_path = '/home/usrg/python_ws/SFA3D/checkpoints/veloster_608_608_3/Model_veloster_608_608_3_epoch_1000.pth'
         model = create_model(configs)
         print('\n\n' + '-*=' * 30 + '\n\n')
         assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
@@ -127,7 +127,7 @@ class SFA3D():
         # print('callback')
         self.is_callback = True
         self.scan = msg
-        self.on_scan(msg)
+        # self.on_scan(msg)
     
     def rot_z(self, yaw):
         return np.array([[np.cos(yaw), -np.sin(yaw)],
@@ -160,8 +160,8 @@ class SFA3D():
         return np.array(bev_clusters_bboxes)
 
     def on_scan(self, scan):
-        if (scan is None or not self.is_callback):
-            return
+        # if (scan is None or not self.is_callback):
+        #     return
         if (scan is None):
             return
         start = timeit.default_timer()
@@ -190,13 +190,13 @@ class SFA3D():
             
         print(fps)
         objects_msg = DetectedObjectArray()
-        objects_msg.header = scan.header
-        # objects_msg.header.stamp = rospy.Time.now()
-        # objects_msg.header.frame_id = scan.header.frame_id
+        # objects_msg.header = scan.header
+        objects_msg.header.stamp = rospy.Time.now()
+        objects_msg.header.frame_id = scan.header.frame_id
         bboxes_msg = BoundingBoxArray()
-        bboxes_msg.header = scan.header
-        # bboxes_msg.header.stamp = rospy.Time.now()
-        # bboxes_msg.header.frame_id = scan.header.frame_id
+        # bboxes_msg.header = scan.header
+        bboxes_msg.header.stamp = rospy.Time.now()
+        bboxes_msg.header.frame_id = scan.header.frame_id
         flag = False
 
         for j in range(self.configs.num_classes):
@@ -293,6 +293,8 @@ class SFA3D():
 if __name__ == '__main__':
     rospy.init_node('SuperFastObjectDetection', anonymous=True)
     sfa3d = SFA3D()
-    # while not rospy.is_shutdown():
-    #     sfa3d.on_scan(sfa3d.scan)
+    r = rospy.Rate(10) # 10hz
+    while not rospy.is_shutdown():
+        sfa3d.on_scan(sfa3d.scan)
+        r.sleep()
     rospy.spin()
