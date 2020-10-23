@@ -27,26 +27,6 @@ if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
 import cv2
 # sys.path.append('/home/khg/Python_proj/SFA3D')
 
-
-def get_xyzi_points(cloud_array, remove_nans=True, dtype=np.float):
-    '''Pulls out x, y, and z columns from the cloud recordarray, and returns
-	a 3xN matrix.
-    '''
-    # remove crap points
-    # print(cloud_array.dtype.names)
-    if remove_nans:
-        mask = np.isfinite(cloud_array['x']) & np.isfinite(cloud_array['y']) & np.isfinite(cloud_array['z']) & np.isfinite(cloud_array['intensity'])
-        cloud_array = cloud_array[mask]
-    
-    # pull out x, y, and z values + intensity
-    points = np.zeros(cloud_array.shape + (4,), dtype=dtype)
-    points[...,0] = cloud_array['x']
-    points[...,1] = cloud_array['y']
-    points[...,2] = cloud_array['z']
-    points[...,3] = cloud_array['intensity']
-
-    return points
-
 class MakeBevImages():
     def __init__(self):
         self.do_overwrite = True
@@ -63,7 +43,10 @@ class MakeBevImages():
 
         self.can_msg = None
         self.trk_bboxes_msg = None
-        self.cols_name = ["frame_id", "object_id", "object_type", "position_x", "position_y", "position_z", "object_length", "object_width", "object_height", "heading", "ego_vel", "ego_steer_ang", "ego_x", "ego_y", "ego_heading"]
+        # self.cols_name = ["frame_id", "object_id", "object_type", "position_x", "position_y", "position_z", "object_length", "object_width", "object_height", "heading", "ego_vel", "ego_steer_ang", "ego_x", "ego_y", "ego_heading"]
+        
+        # object_id: 0 => ego state
+        self.cols_name = ["frame_id", "object_id", "object_type", "position_x", "position_y", "position_z", "object_length", "object_width", "object_height", "heading", "ego_vel", "ego_steer_ang", "ego_x", "ego_y", "ego_heading", "other_vx", "other_vy"]
 
         # Image for time sync
         self.bridge = CvBridge()
@@ -132,8 +115,12 @@ class MakeBevImages():
         ego_vel = can_msg.VS_CAN # km/h
         ego_steer_ang = can_msg.mdps_str_ang # angle
 
-        ####### track bboxes #######
+        ####### ego state append ######
         trk_features = []
+        feature = [self.start_index, 0, 1, 0., 0., 0., 3.9, 1.6, 1.56, 0, ego_vel, ego_steer_ang, ego_pose_msg.pose.position.x, ego_pose_msg.pose.position.y, ego_yaw, 0, 0]
+        trk_features.append(feature)
+
+        ####### track bboxes #######
         for trk in trk_bboxes_msg.objects:
             position = trk.pose.position
             dimensions = trk.dimensions
@@ -142,9 +129,10 @@ class MakeBevImages():
                 trk.pose.orientation.y,
                 trk.pose.orientation.z,
                 trk.pose.orientation.w)
+            velocity = trk.velocity
             euler = tf.transformations.euler_from_quaternion(quaternion)
             yaw = euler[2]
-            feature = [self.start_index, trk.id, int(trk.label), position.x, position.y, position.z, dimensions.x, dimensions.y, dimensions.z, yaw, ego_vel, ego_steer_ang, ego_pose_msg.pose.position.x, ego_pose_msg.pose.position.y, ego_yaw]
+            feature = [self.start_index, trk.id, int(trk.label), position.x, position.y, position.z, dimensions.x, dimensions.y, dimensions.z, yaw, ego_vel, ego_steer_ang, ego_pose_msg.pose.position.x, ego_pose_msg.pose.position.y, ego_yaw, velocity.linear.x, velocity.linear.y]
             trk_features.append(feature)
         # frame_id, object_id, object_type, position_x, position_y, position_z, object_length, object_width, object_height, heading, ego_vel, ego_steer_ang
         trk_features = np.array(trk_features)
