@@ -28,9 +28,12 @@
 ### 2.1. Requirement
 
 ```shell script
-git clone https://github.com/maudzung/Super-Fast-Accurate-3D-Object-Detection.git SFA3D
+cd ~/catkin_ws/src
+git clone https://github.com/hyungikim4/SFA3D.git
 cd SFA3D/
 pip install .
+
+cd ~/catkin_ws && catkin_make
 ```
 
 ### 2.2. Data Preparation
@@ -102,6 +105,118 @@ python train.py --multiprocessing-distributed --world-size 1 --rank 0 --batch_si
     python train.py --dist-url 'tcp://IP_OF_NODE2:FREEPORT' --multiprocessing-distributed --world-size 2 --rank 1 --batch_size 64 --num_workers 8
     ```
 
+### 2.4. Training and Testing on your own dataset
+
+Since it is difficult to create a large amount of custom data, it is recommended to perform fine tuning with the custom dataset after training according to the desired config with the KITTI dataset.
+
+#### 2.4.1. Prepare your Dataset
+
+##### 2.4.1.1. Setting config
+
+```shell script
+cd ros/src/super_fast_object_detection/src/
+```
+Modify `veloster_config_2sides.py` to fit your dataset. 
+
+|Parameter| Description|
+----------|--------
+|`boundary`|Front lidar x,y,z range. **Range of z is dependent on the height of Lidar sensor.**|
+|`boundary_back`|Back lidar x,y,z range.|
+|`BEV_WIDTH`|The width of BEV RGB map.|
+|`BEV_HEIGHT`|The height of BEV RGB map.|
+|`Tr_velo_to_cam`|Transform matrix(3x4) from Lidar coordinate to Image pixel coordinate.|
+
+##### 2.4.1.2. Make training dataset
+
+Save the Lidar raw pointcloud, front image, and BEV RGB map at 1 Hz from the rosbag in which the Lidar data and front image data are logged.
+
+For easily labeling, BEV binary map of ground filtered pointcloud and BEV RGB map are saved.
+
+```
+roslaunch points_preprocessor_usi groundfilter.launch
+python make_training_data_for_labeling_2sides_without_map.py
+```
+
+```plain
+└── save_path
+       ├── bev          <-- BEV RGB map image
+       ├── front_image  <-- front RGB image
+       ├── lidar        <-- Lidar raw data (.npy)
+       └── label        <-- label data (**TO DO**)
+```
+
+Figure
+
+##### 2.4.1.3. Auto-labeling
+
+Auto-labeling using the trained model
+
+`python3 inference_label_2sides.py`
+
+|Parameter| Type| Description|
+----------|-----|--------
+|`self.conf_thres`|*double* |Confidence threshold. Only objects with confidence higher than `self.conf_thres` are stored in the label text.|
+|`configs.pretrained_path`|*string*|Pretrained model path|
+|`data_root`|*string*|Root path of your dataset.|
+|`have_train_txt`|*bool*|If it is true, inference only for data in `train.txt`|
+
+##### 2.4.1.4. labeling
+
+Follow this guideline.
+
+https://github.com/zexihan/labelImg-kitti
+
+##### 2.4.1.5. Make ImageSets
+
+```shell script
+cd ~/catkin_ws/src/SFA3D/sfa/data_process
+python write_train_txt.py
+```
+
+##### 2.4.1.6. Visualize the dataset
+
+Visualize 3D point clouds with 3D boxes in Rviz. 
+
+```shell script
+cd ~/catkin_ws/src/SFA3D/sfa/data_process
+python3 veloster_2sides_dataset.py
+```
+
+Figure
+
+#### 2.4.2. Training
+
+##### 2.4.2.1. Setting config
+
+```shell script
+cd ~/catkin_ws/src/SFA3D
+cp ros/src/super_fast_object_detection/src/veloster_config_2sides.py sfa/config/
+```
+
+##### 2.4.2.1. Setting training config
+
+|Parameter| Type| Description|
+----------|-----|--------
+|`saved_fn`|*string* |Path where model will be saved|
+|`pretrained_path`|*string*|Pretrained model path|
+|`configs.input_size`|*int*|The image size of BEV RGB map.|
+|`configs.hm_size`|*int*|`configs.input_size / configs.down_ratio`|
+|`configs.num_classes`|*int*|The number of classes|
+
+##### 2.4.2.1. Training
+
+```shell script
+cd ~/catkin_ws/src/SFA3D/sfa
+python3 train.py
+```
+
+#### 2.4.3. Inference with ROS
+
+```shell script
+source ~/catkin_ws/devel/setup.bash
+rosrun super_fast_object_detection rosInference_2sides.py
+```
+
 #### Tensorboard
 
 - To track the training progress, go to the `logs/` folder and 
@@ -112,13 +227,6 @@ tensorboard --logdir=./
 ```
 
 - Then go to [http://localhost:6006/](http://localhost:6006/)
-
-
-## Contact
-
-If you think this work is useful, please give me a star! <br>
-If you find any errors or have any suggestions, please contact me (**Email:** `nguyenmaudung93.kstn@gmail.com`). <br>
-Thank you!
 
 
 ## Citation
