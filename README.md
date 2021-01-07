@@ -145,7 +145,7 @@ python make_training_data_for_labeling_2sides_without_map.py
        └── label        <-- label data (**TO DO**)
 ```
 
-Figure
+![input](/images/Label_images.png?raw=true)
 
 ##### 2.4.1.3. Auto-labeling
 
@@ -182,7 +182,7 @@ cd ~/catkin_ws/src/SFA3D/sfa/data_process
 python3 veloster_2sides_dataset.py
 ```
 
-Figure
+![visualization](/images/Visualize_the_dataset.png?raw=true)
 
 #### 2.4.2. Training
 
