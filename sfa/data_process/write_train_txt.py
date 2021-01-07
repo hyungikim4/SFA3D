@@ -33,4 +33,4 @@ for num, label_file in enumerate(label_list_ext):
 	
 f.close()
 
-# copy_files(save_path, "train", save_path, "test",".txt")
+shutil.copy(os.path.join(save_path, "train.txt"), os.path.join(save_path, "val.txt"))
