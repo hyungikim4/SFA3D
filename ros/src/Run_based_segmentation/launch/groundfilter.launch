@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="points_preprocessor_usi" type="groundplanfit" name="groundplanfit" output="screen">
+        <remap from="/velodyne_points" to="/transformed_pointcloud"/>
+    </node>
+</launch>
