@@ -160,12 +160,12 @@ class VelosterDataset(Dataset):
         for img_label in img_labels:
             [cls_id, cx, cy, w, h, angle] = img_label
             x = (cnf.BEV_HEIGHT-cy)*cnf.DISCRETIZATION + cnf.boundary["minX"]
-            y = -(cx - float(cnf.BEV_HEIGHT)/2.)*cnf.DISCRETIZATION
+            y = -(cx - float(cnf.BEV_WIDTH)/2.)*cnf.DISCRETIZATION
             if cls_id == 0 or cls_id == 2: # Pedestrian, Cyclist
                 height = 1.73
             else: # Car
                 height = 1.56
-            z = height / 2.
+            z = height / 2. + cnf.boundary['minZ']
             width = w*cnf.DISCRETIZATION
             length = h*cnf.DISCRETIZATION
             ry = -angle
@@ -510,7 +510,7 @@ if __name__ == '__main__':
             # Draw rotated box
             yaw = -yaw
             y1 = int((x - cnf.boundary['minX']) / cnf.DISCRETIZATION)
-            x1 = int((y - cnf.boundary['minY']) / cnf.DISCRETIZATION)
+            x1 = int((y - cnf.boundary['minX']) / cnf.DISCRETIZATION)
             w1 = int(w / cnf.DISCRETIZATION)
             l1 = int(l / cnf.DISCRETIZATION)
 
